@@ -222,8 +222,6 @@
 </head>
 <body class="container">
 
-
-
 <!-- 상단 메뉴 -->
 <div class="nav-top text-center mt-3">
     <a href="#">오점머</a>
@@ -294,7 +292,7 @@
         </td>
         <td th:text="${responseDTO.totalCount - (responseDTO.pageRequestDTO.page - 1) * responseDTO.pageRequestDTO.size - i.index}">1</td>
         <td class="title-cell">
-            <a th:href="@{|/board/read?id=${b.id}&userGender=|}"
+            <a th:href="@{/board/read(id=${b.id}, userGender='성별상관무', page=${responseDTO.current}, type=${param.type}, keyword=${param.keyword}, genderFilter=${param.genderFilter}, foodFilter=${param.foodFilter})}"
                th:text="${b.title}" onclick="addUserGender(this)">제목</a>
         </td>
         <td th:text="${b.writer}">글쓴이</td>
@@ -338,55 +336,4 @@
     <form method="get" action="/board/list" class="search-form">
         <select name="type" class="form-select">
             <option value="">전체</option>
-            <option value="t" th:selected="${param.type == 't'}">제목</option>
-            <option value="c" th:selected="${param.type == 'c'}">내용</option>
-            <option value="w" th:selected="${param.type == 'w'}">작성자</option>
-            <option value="tc" th:selected="${param.type == 'tc'}">제목+내용</option>
-            <option value="tw" th:selected="${param.type == 'tw'}">제목+작성자</option>
-            <option value="cw" th:selected="${param.type == 'cw'}">내용+작성자</option>
-            <option value="tcw" th:selected="${param.type == 'tcw'}">제목+내용+작성자</option>
-        </select>
-        <input class="form-control" type="search" name="keyword" th:value="${param.keyword}" placeholder="검색어를 입력하세요" aria-label="Search">
-        <button class="btn btn-outline-secondary" type="submit">검색</button>
-
-        <!-- 필터 조건 유지 -->
-        <input type="hidden" name="genderFilter" th:value="${param.genderFilter}">
-        <input type="hidden" name="foodFilter" th:value="${param.foodFilter}">
-    </form>
-    <a href="/board/register">
-        <button class="btn btn-dark">글쓰기</button>
-    </a>
-</div>
-
-<!-- 게시글 수 정보 -->
-<div class="text-center mt-3">
-    <small class="text-muted">
-        총 <span th:text="${responseDTO.totalCount}">0</span>개의 게시글 중
-        <span th:text="${responseDTO.current}">1</span> 페이지
-        (전체 <span th:text="${(responseDTO.totalCount - 1) / responseDTO.pageRequestDTO.size + 1}">1</span> 페이지)
-    </small>
-</div>
-
-<script>
-    function updateUserGender() {
-        const userGender = document.getElementById('userGender').value;
-        localStorage.setItem('userGender', userGender);
-    }
-
-    function addUserGender(link) {
-        const userGender = document.getElementById('userGender').value;
-        const href = link.getAttribute('href');
-        link.setAttribute('href', href + userGender);
-    }
-
-    // 페이지 로드 시 저장된 성별 복원
-    window.addEventListener('DOMContentLoaded', function() {
-        const savedGender = localStorage.getItem('userGender');
-        if (savedGender) {
-            document.getElementById('userGender').value = savedGender;
-        }
-    });
-</script>
-
-</body>
-</html>
+            <option value="t" th:selected="${param.type == 't

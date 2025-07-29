@@ -1,6 +1,7 @@
 package webproject_2team.lunch_matching.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -18,7 +19,10 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Controller
 @RequiredArgsConstructor
@@ -39,6 +43,11 @@ public class BoardController {
     @GetMapping("/board/read")
     public String read(@RequestParam("id") Long id,
                        @RequestParam(value = "userGender", required = false, defaultValue = "성별상관무") String userGender,
+                       @RequestParam(value = "page", required = false, defaultValue = "1") int page,
+                       @RequestParam(value = "type", required = false) String type,
+                       @RequestParam(value = "keyword", required = false) String keyword,
+                       @RequestParam(value = "genderFilter", required = false) String genderFilter,
+                       @RequestParam(value = "foodFilter", required = false) String foodFilter,
                        Model model) {
         Board board = boardService.read(id);
         if (board != null) {
@@ -54,66 +63,188 @@ public class BoardController {
             model.addAttribute("board", board);
             model.addAttribute("comments", comments);
             model.addAttribute("userGender", userGender);
+
+            // 페이지 정보 추가
+            model.addAttribute("page", page);
+            model.addAttribute("type", type);
+            model.addAttribute("keyword", keyword);
+            model.addAttribute("genderFilter", genderFilter);
+            model.addAttribute("foodFilter", foodFilter);
+
             return "read";
         } else {
             return "redirect:/board/list";
         }
     }
 
+    // REST API 방식으로 댓글 작성
+    @PostMapping("/api/board/comment")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> addCommentApi(@RequestParam("boardId") Long boardId,
+                                                             @RequestParam("content") String content,
+                                                             @RequestParam("writer") String writer) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            // 댓글 내용 바이트 수 검증 (100바이트)
+            if (content != null && content.getBytes("UTF-8").length > 100) {
+                response.put("success", false);
+                response.put("message", "댓글은 100바이트를 초과할 수 없습니다.");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            // 필수 필드 검증
+            if (content == null || content.trim().isEmpty()) {
+                response.put("success", false);
+                response.put("message", "댓글 내용을 입력해주세요.");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            if (writer == null || writer.trim().isEmpty()) {
+                response.put("success", false);
+                response.put("message", "작성자를 입력해주세요.");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            // 댓글 저장
+            Comment comment = commentService.saveComment(boardId, content, writer);
+
+            // 성공 응답 데이터 구성
+            Map<String, Object> commentData = new HashMap<>();
+            commentData.put("id", comment.getId());
+            commentData.put("content", comment.getContent());
+            commentData.put("writer", comment.getWriter());
+            commentData.put("createdAt", comment.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+
+            response.put("success", true);
+            response.put("message", "댓글이 성공적으로 작성되었습니다.");
+            response.put("comment", commentData);
+
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalStateException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        } catch (UnsupportedEncodingException e) {
+            response.put("success", false);
+            response.put("message", "댓글 처리 중 오류가 발생했습니다.");
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // REST API 방식으로 댓글 삭제
+    @DeleteMapping("/api/board/comment/{id}")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> deleteCommentApi(@PathVariable("id") Long commentId) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            commentService.deleteComment(commentId);
+            response.put("success", true);
+            response.put("message", "댓글이 삭제되었습니다.");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "댓글 삭제 중 오류가 발생했습니다.");
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // 기존 댓글 작성 메서드 (하위 호환용)
     @PostMapping("/board/comment")
     public String addComment(@RequestParam("boardId") Long boardId,
                              @RequestParam("content") String content,
                              @RequestParam("writer") String writer,
                              @RequestParam(value = "userGender", required = false, defaultValue = "성별상관무") String userGender,
+                             @RequestParam(value = "page", required = false, defaultValue = "1") int page,
+                             @RequestParam(value = "type", required = false) String type,
+                             @RequestParam(value = "keyword", required = false) String keyword,
+                             @RequestParam(value = "genderFilter", required = false) String genderFilter,
+                             @RequestParam(value = "foodFilter", required = false) String foodFilter,
                              Model model) {
         try {
             // 댓글 내용 바이트 수 검증 (100바이트)
             if (content != null && content.getBytes("UTF-8").length > 100) {
                 model.addAttribute("commentError", "댓글은 100바이트를 초과할 수 없습니다.");
-                return read(boardId, userGender, model);
+                return read(boardId, userGender, page, type, keyword, genderFilter, foodFilter, model);
             }
 
             // 필수 필드 검증
             if (content == null || content.trim().isEmpty()) {
                 model.addAttribute("commentError", "댓글 내용을 입력해주세요.");
-                return read(boardId, userGender, model);
+                return read(boardId, userGender, page, type, keyword, genderFilter, foodFilter, model);
             }
 
             if (writer == null || writer.trim().isEmpty()) {
                 model.addAttribute("commentError", "작성자를 입력해주세요.");
-                return read(boardId, userGender, model);
+                return read(boardId, userGender, page, type, keyword, genderFilter, foodFilter, model);
             }
 
             // 댓글 저장
             commentService.saveComment(boardId, content, writer);
 
-            // 성공적으로 저장된 후 리다이렉트
-            try {
-                String encodedUserGender = URLEncoder.encode(userGender, "UTF-8");
-                return "redirect:/board/read?id=" + boardId + "&userGender=" + encodedUserGender;
-            } catch (Exception e) {
-                return "redirect:/board/read?id=" + boardId + "&userGender=" + userGender;
+            // 성공적으로 저장된 후 리다이렉트 (페이지 정보 포함)
+            StringBuilder redirectUrl = new StringBuilder("/board/read?id=" + boardId);
+            redirectUrl.append("&userGender=").append(URLEncoder.encode(userGender, "UTF-8"));
+            redirectUrl.append("&page=").append(page);
+
+            if (type != null && !type.trim().isEmpty()) {
+                redirectUrl.append("&type=").append(URLEncoder.encode(type, "UTF-8"));
             }
+            if (keyword != null && !keyword.trim().isEmpty()) {
+                redirectUrl.append("&keyword=").append(URLEncoder.encode(keyword, "UTF-8"));
+            }
+            if (genderFilter != null && !genderFilter.trim().isEmpty()) {
+                redirectUrl.append("&genderFilter=").append(URLEncoder.encode(genderFilter, "UTF-8"));
+            }
+            if (foodFilter != null && !foodFilter.trim().isEmpty()) {
+                redirectUrl.append("&foodFilter=").append(URLEncoder.encode(foodFilter, "UTF-8"));
+            }
+
+            return "redirect:" + redirectUrl.toString();
 
         } catch (IllegalStateException e) {
             model.addAttribute("commentError", e.getMessage());
-            return read(boardId, userGender, model);
+            return read(boardId, userGender, page, type, keyword, genderFilter, foodFilter, model);
         } catch (UnsupportedEncodingException e) {
             model.addAttribute("commentError", "댓글 처리 중 오류가 발생했습니다.");
-            return read(boardId, userGender, model);
+            return read(boardId, userGender, page, type, keyword, genderFilter, foodFilter, model);
         }
     }
 
     @PostMapping("/board/comment/delete/{id}")
     public String deleteComment(@PathVariable("id") Long commentId,
                                 @RequestParam("boardId") Long boardId,
-                                @RequestParam(value = "userGender", required = false, defaultValue = "성별상관무") String userGender) {
+                                @RequestParam(value = "userGender", required = false, defaultValue = "성별상관무") String userGender,
+                                @RequestParam(value = "page", required = false, defaultValue = "1") int page,
+                                @RequestParam(value = "type", required = false) String type,
+                                @RequestParam(value = "keyword", required = false) String keyword,
+                                @RequestParam(value = "genderFilter", required = false) String genderFilter,
+                                @RequestParam(value = "foodFilter", required = false) String foodFilter) {
         commentService.deleteComment(commentId);
+
         try {
-            String encodedUserGender = URLEncoder.encode(userGender, "UTF-8");
-            return "redirect:/board/read?id=" + boardId + "&userGender=" + encodedUserGender;
+            StringBuilder redirectUrl = new StringBuilder("/board/read?id=" + boardId);
+            redirectUrl.append("&userGender=").append(URLEncoder.encode(userGender, "UTF-8"));
+            redirectUrl.append("&page=").append(page);
+
+            if (type != null && !type.trim().isEmpty()) {
+                redirectUrl.append("&type=").append(URLEncoder.encode(type, "UTF-8"));
+            }
+            if (keyword != null && !keyword.trim().isEmpty()) {
+                redirectUrl.append("&keyword=").append(URLEncoder.encode(keyword, "UTF-8"));
+            }
+            if (genderFilter != null && !genderFilter.trim().isEmpty()) {
+                redirectUrl.append("&genderFilter=").append(URLEncoder.encode(genderFilter, "UTF-8"));
+            }
+            if (foodFilter != null && !foodFilter.trim().isEmpty()) {
+                redirectUrl.append("&foodFilter=").append(URLEncoder.encode(foodFilter, "UTF-8"));
+            }
+
+            return "redirect:" + redirectUrl.toString();
         } catch (Exception e) {
-            return "redirect:/board/read?id=" + boardId + "&userGender=" + userGender;
+            return "redirect:/board/read?id=" + boardId + "&userGender=" + userGender + "&page=" + page;
         }
     }
 
