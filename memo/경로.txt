@@ -4,4 +4,3 @@ http://localhost:8080/board/list
 글쓰기 페이지
 http://localhost:8080/board/register
 
-1
