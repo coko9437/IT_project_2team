@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/layout}">
+<head>
+    <title>리뷰 목록</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <h1>리뷰 목록</h1>
+
+        <div class="search-area">
+            <form th:action="@{/review/list}" method="get">
+                <select name="type">
+                    <option value="">--- 검색 타입 ---</option>
+                    <option value="w" th:selected="${pageRequestDTO.type == 'w'}">작성자</option>
+                    <option value="c" th:selected="${pageRequestDTO.type == 'c'}">내용</option>
+                    <option value="m" th:selected="${pageRequestDTO.type == 'm'}">메뉴</option>
+                    <option value="p" th:selected="${pageRequestDTO.type == 'p'}">장소</option>
+                </select>
+                <input type="text" name="keyword" th:value="${pageRequestDTO.keyword}">
+                <button type="submit">검색</button>
+                <button type="button" onclick="location.href='/review/list'">초기화</button>
+            </form>
+        </div>
+
+        <div>
+            <a href="/review/register">새 리뷰 등록</a>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>작성자</th>
+                    <th>내용</th>
+                    <th>메뉴</th>
+                    <th>장소</th>
+                    <th>평점</th>
+                    <th>감정</th>
+                    <th>사진</th>
+                    <th>등록일</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="review : ${responseDTO.dtoList}">
+                    <td><a th:href="@{/review/read(review_id=${review.review_id}, page=${pageRequestDTO.page}, size=${pageRequestDTO.size}, type=${pageRequestDTO.type}, keyword=${pageRequestDTO.keyword})}" th:text="${review.review_id}"></a></td>
+                    <td th:text="${review.member_id}"></td>
+                    <td th:text="${review.content}"></td>
+                    <td th:text="${review.menu}"></td>
+                    <td th:text="${review.place}"></td>
+                    <td>
+                        <th:block th:each="i : ${#numbers.sequence(1, 5)}">
+                            <span th:if="${i <= review.rating}">★</span>
+                            <span th:unless="${i <= review.rating}">☆</span>
+                        </th:block>
+                    </td>
+                    <td th:text="${emoticonMap.get(review.emotion)}"></td>
+                    <td>
+                        <div style="position: relative; width: 50px; height: 50px;">
+                            <img th:if="${review.uploadFileNames != null and !review.uploadFileNames.isEmpty()}"
+                                 th:src="@{/view/{fileName}(fileName=${review.uploadFileNames[0].getThumbnailLink()})}"
+                                 alt="Thumbnail" style="width: 100%; height: 100%; object-fit: cover;">
+                            <span th:if="${review.uploadFileNames != null and review.uploadFileNames.size() > 1}"
+                                  style="position: absolute; bottom: 5px; right: 5px; background-color: rgba(0,0,0,0.5); color: white; padding: 2px 5px; border-radius: 5px; font-size: 12px;"
+                                  th:text="'+' + ${review.uploadFileNames.size() - 1}"></span>
+                        </div>
+                    </td>
+                    <td th:text="${#temporals.format(review.regDate, 'yyyy-MM-dd HH:mm')}"></td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(responseDTO.dtoList)}">
+                    <td colspan="8">등록된 리뷰가 없습니다.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="pagination">
+            <a th:if="${responseDTO.prev}"
+               th:href="@{/review/list(page=${responseDTO.start - 1}, size=${responseDTO.size}, type=${pageRequestDTO.type}, keyword=${pageRequestDTO.keyword})}">이전</a>
+            <a th:each="page : ${#numbers.sequence(responseDTO.start, responseDTO.end)}"
+               th:classappend="${page == responseDTO.page ? 'active' : ''}"
+               th:href="@{/review/list(page=${page}, size=${responseDTO.size}, type=${pageRequestDTO.type}, keyword=${pageRequestDTO.keyword})}"
+               th:text="${page}"></a>
+            <a th:if="${responseDTO.next}"
+               th:href="@{/review/list(page=${responseDTO.end + 1}, size=${responseDTO.size}, type=${pageRequestDTO.type}, keyword=${pageRequestDTO.keyword})}">다음</a>
+        </div>
+    </div>
+</body>
+</html>

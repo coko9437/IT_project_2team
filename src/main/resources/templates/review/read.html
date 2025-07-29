@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/layout}">
+<head>
+    <title>리뷰 상세</title>
+    <link rel="stylesheet" th:href="@{/css/review/register.css}">
+</head>
+<body>
+<div layout:fragment="content">
+    <h1>리뷰 상세 정보</h1>
+
+    <div class="form-container">
+        <div>
+            <label>리뷰 ID</label>
+            <p class="form-control-static" th:text="${reviewDTO.review_id}"></p>
+        </div>
+        <div>
+            <label>작성자 ID</label>
+            <p class="form-control-static" th:text="${reviewDTO.member_id}"></p>
+        </div>
+        <div>
+            <label>내용</label>
+            <p class="form-control-static" th:text="${reviewDTO.content}"></p>
+        </div>
+        <div>
+            <label>메뉴</label>
+            <p class="form-control-static" th:text="${reviewDTO.menu}"></p>
+        </div>
+        <div>
+            <label>장소</label>
+            <p class="form-control-static" th:text="${reviewDTO.place}"></p>
+        </div>
+        <div>
+            <label>평점</label>
+            <div id="star-rating">
+                <th:block th:each="i : ${#numbers.sequence(1, 5)}">
+                    <span th:if="${i <= reviewDTO.rating}" class="star filled">★</span>
+                    <span th:unless="${i <= reviewDTO.rating}" class="star">☆</span>
+                </th:block>
+            </div>
+        </div>
+        <div>
+            <label>감정</label>
+            <p class="form-control-static" th:text="${emoticonMap.get(reviewDTO.emotion)}"></p>
+        </div>
+        <div>
+            <label>등록일</label>
+            <p class="form-control-static" th:text="${#temporals.format(reviewDTO.regDate, 'yyyy-MM-dd HH:mm')}"></p>
+        </div>
+        <div>
+            <label>수정일</label>
+            <p class="form-control-static" th:text="${#temporals.format(reviewDTO.modDate, 'yyyy-MM-dd HH:mm')}"></p>
+        </div>
+
+        <div th:if="${reviewDTO.uploadFileNames != null and !reviewDTO.uploadFileNames.isEmpty()}">
+            <label>첨부 이미지</label>
+            <div class="image-gallery">
+                <div class="main-image-container">
+                    <img id="mainImage" th:if="${reviewDTO.uploadFileNames != null and !reviewDTO.uploadFileNames.isEmpty()}"
+                         th:src="@{/view/{fileName}(fileName=${reviewDTO.uploadFileNames[0].link})}" alt="리뷰 이미지">
+                    <button type="button" class="nav-button prev-button">&lt;</button>
+                    <button type="button" class="nav-button next-button">&gt;</button>
+                </div>
+                <div class="thumbnail-strip">
+                    <img th:each="fileInfo, stat : ${reviewDTO.uploadFileNames}"
+                         th:src="@{/view/{fileName}(fileName=${fileInfo.thumbnailLink})}"
+                         alt="썸네일 이미지"
+                         th:classappend="${stat.index == 0 ? 'active-thumbnail' : ''}"
+                         th:data-index="${stat.index}"
+                         class="thumbnail">
+                </div>
+            </div>
+        </div>
+
+        <!-- Like Section -->
+        <div class="like-section">
+            <button type="button" id="likeButton" class="like-button">
+                <span id="likeIcon" th:text="${reviewDTO.likedByCurrentUser ? '❤️' : '🤍'}"></span>
+                좋아요
+            </button>
+            <span id="likeCount" class="like-count" th:text="${reviewDTO.likeCount}">0</span>
+        </div>
+
+        <div class="button-area">
+            <a th:href="@{/review/modify(review_id=${reviewDTO.review_id}, page=${pageRequestDTO.page}, size=${pageRequestDTO.size}, type=${pageRequestDTO.type}, keyword=${pageRequestDTO.keyword})}">
+                <button type="button">수정</button>
+            </a>
+            <button type="button" id="toListBtn">목록으로</button>
+        </div>
+
+        <!-- Comments Section -->
+        <div class="comments-section">
+            <h3>댓글</h3>
+            <div id="commentList" class="comment-list">
+                <!-- Comments will be loaded here by JavaScript -->
+            </div>
+            <div class="comment-input-form">
+                <textarea id="commentContent" placeholder="댓글을 입력하세요..." rows="3"></textarea>
+                <button type="button" id="addCommentButton">댓글 등록</button>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+<th:block layout:fragment="script">
+    <script th:inline="javascript">
+        const uploadFileNames = [[${reviewDTO.uploadFileNames}]];
+        const reviewId = [[${reviewDTO.review_id}]]; // reviewId 추가
+        const initialLikeStatus = [[${reviewDTO.likedByCurrentUser}]]; // 초기 좋아요 상태 추가
+
+        document.getElementById('toListBtn').addEventListener('click', function() {
+            const page = [[${pageRequestDTO.page}]];
+            const size = [[${pageRequestDTO.size}]];
+            const type = [[${pageRequestDTO.type}]] || '';
+            const keyword = [[${pageRequestDTO.keyword}]] || '';
+
+            let url = `/review/list?page=${page}&size=${size}`;
+            if (type && keyword) {
+                url += `&type=${type}&keyword=${keyword}`;
+            }
+            window.location.href = url;
+        });
+    </script>
+    <script th:src="@{/js/review/review-detail.js}"></script>
+</th:block>
+</html>
