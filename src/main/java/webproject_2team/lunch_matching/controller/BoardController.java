@@ -168,6 +168,50 @@ public class BoardController {
         }
     }
 
+    // REST API 방식으로 댓글 수정
+    @PutMapping("/api/board/comment/{id}")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> updateCommentApi(@PathVariable("id") Long commentId,
+                                                                @RequestBody Map<String, String> payload) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            String content = payload.get("content");
+
+            // 유효성 검증
+            if (content == null || content.trim().isEmpty()) {
+                response.put("success", false);
+                response.put("message", "댓글 내용을 입력해주세요.");
+                return ResponseEntity.badRequest().body(response);
+            }
+            if (content.getBytes("UTF-8").length > 100) {
+                response.put("success", false);
+                response.put("message", "댓글은 100바이트를 초과할 수 없습니다.");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            // 댓글 수정 서비스 호출
+            Comment updatedComment = commentService.updateComment(commentId, content);
+
+            // 성공 응답 데이터 구성
+            Map<String, Object> commentData = new HashMap<>();
+            commentData.put("id", updatedComment.getId());
+            commentData.put("content", updatedComment.getContent());
+
+            response.put("success", true);
+            response.put("comment", commentData);
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(404).body(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "댓글 수정 중 오류가 발생했습니다.");
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
     // 기존 댓글 작성 메서드 (하위 호환용)
     @PostMapping("/board/comment")
     public String addComment(@RequestParam("boardId") Long boardId,
