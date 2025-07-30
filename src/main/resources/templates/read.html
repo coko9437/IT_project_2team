@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${board.title} + ' | 모집 상세 정보'">게시글 보기</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f8f9fa; }
+        .content-area { background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 20px; }
+        .board-title { font-size: 1.8rem; font-weight: bold; color: #333; border-bottom: 2px solid #ff7f50; padding-bottom: 10px; margin-bottom: 20px; }
+        .board-meta { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .board-meta p { margin: 5px 0; font-size: 0.95rem; }
+        .deadline-info { border: 1px solid #ffeaa7; padding: 10px; border-radius: 5px; margin-bottom: 20px; text-align: center; }
+        .deadline-expired { background-color: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .deadline-soon { background-color: #ffeaa7; border-color: #fdcb6e; color: #856404; }
+        .board-content { background-color: #fff; padding: 20px; border: 1px solid #e9ecef; border-radius: 5px; min-height: 150px; line-height: 1.6; white-space: pre-wrap; }
+        .btn-area { margin-top: 30px; text-align: center; }
+        .comment-section { margin-top: 40px; padding-top: 20px; border-top: 2px solid #e9ecef; }
+        .comment-form { background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .comment-item { background-color: white; border: 1px solid #e9ecef; border-radius: 8px; padding: 15px; margin-bottom: 10px; }
+        .comment-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.9rem; color: #6c757d; }
+        .countdown-display { font-size: 1.2rem; font-weight: bold; color: #fd7e14; }
+        .expired-message { color: #dc3545; font-weight: bold; }
+        .char-counter { font-size: 0.8rem; color: #6c757d; text-align: right; margin-top: 5px; }
+        .char-counter.over-limit { color: #dc3545; font-weight: bold; }
+
+        /* 지도 관련 스타일 */
+        #map-section { display: grid; grid-template-columns: 1fr 1.5fr; gap: 20px; height: 450px; }
+        #map-controls { display: flex; flex-direction: column; overflow: hidden; }
+        #placesList { list-style: none; padding: 0; margin: 0; flex-grow: 1; overflow-y: auto; border: 1px solid #dee2e6; border-radius: .25rem; }
+        #placesList li { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
+        #placesList li:hover { background-color: #f0f0f0; }
+        #placesList .highlighted { background-color: #e0f2fe !important; font-weight: bold; }
+        #map-wrapper { position: relative; width: 100%; height: 100%; }
+        #map { width: 100%; height: 100%; border-radius: 8px; }
+        .info { padding: 5px; border-radius: 5px; background: #fff; border: 1px solid #ccc; white-space: nowrap; }
+        .info .title { font-weight: bold; font-size: 14px; }
+        #pagination { flex-shrink: 0; padding-top: 10px; }
+        #pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+</head>
+<body class="container">
+
+<div class="content-area">
+    <h1 class="board-title" th:text="${board.title}"></h1>
+
+    <div class="board-meta">
+        <div class="row">
+            <div class="col-md-6"><p><strong>작성자:</strong> <span th:text="${board.writer}"></span></p><p><strong>지역:</strong> <span th:text="${board.region}"></span></p></div>
+            <div class="col-md-6"><p><strong>성별 조건:</strong> <span th:text="${board.genderLimit}"></span></p><p><strong>음식 종류:</strong> <span th:text="${board.foodCategory}"></span></p></div>
+        </div>
+        <p><strong>작성시간:</strong> <span th:text="${#temporals.format(board.createdAt, 'yyyy-MM-dd HH:mm')}"></span></p>
+    </div>
+    <div th:if="${board.deadlineAt != null}" class="deadline-info" id="deadlineInfo"><div id="countdown" th:data-remaining="${board.getRemainingMinutes()}"></div></div>
+    <div class="board-content" th:text="${board.content}"></div>
+
+    <div class="mt-4">
+        <h4 class="mb-3">📍 모집 장소 및 주변 정보</h4>
+        <div id="map-section">
+            <div id="map-controls">
+                <div class="input-group mb-3">
+                    <input type="text" id="nearby-keyword" class="form-control" placeholder="주변 장소 검색 (예: 카페)">
+                    <button class="btn btn-outline-primary" type="button" onclick="searchNearby(1)">주변 검색</button>
+                </div>
+                <ul id="placesList">
+                    <li class="text-center text-muted p-5">
+                        <strong th:text="${board.locationName ?: board.region}"></strong><br>
+                        <small>이 장소 주변의 다른 곳을 검색해보세요.</small>
+                    </li>
+                </ul>
+                <div id="pagination" class="d-flex justify-content-between align-items-center mt-3">
+                    <button id="prevBtn" class="btn btn-sm btn-outline-secondary" onclick="movePage(-1)" disabled>이전</button>
+                    <span id="pageInfo" class="text-muted small"></span>
+                    <button id="nextBtn" class="btn btn-sm btn-outline-secondary" onclick="movePage(1)" disabled>다음</button>
+                </div>
+            </div>
+            <div id="map-wrapper">
+                <div id="map"></div>
+                <button type="button" onclick="displayMyLocation()" class="btn btn-light btn-sm position-absolute shadow-sm" style="top: 10px; right: 10px; z-index: 2;">내 위치</button>
+                <select id="radiusSelect" onchange="changeSearchRadius()" class="form-select form-select-sm position-absolute shadow-sm" style="top: 10px; left: 10px; z-index: 2; width: auto;">
+                    <option value="500" selected>500m</option>
+                    <option value="1000">1km</option>
+                    <option value="2000">2km</option>
+                    <option value="5000">5km</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="btn-area">
+        <a th:href="@{/board/list(page=${page}, type=${type}, keyword=${keyword}, genderFilter=${genderFilter}, foodFilter=${foodFilter})}" class="btn btn-primary">목록으로</a>
+        <a th:href="@{/board/modify/{id}(id=${board.id})}" class="btn btn-info">수정하기</a>
+        <form th:action="@{/board/delete/{id}(id=${board.id})}" method="post" style="display: inline;">
+            <button type="submit" class="btn btn-danger" onclick="return confirm('정말로 삭제하시겠습니까?');">삭제하기</button>
+        </form>
+    </div>
+
+    <div class="comment-section">
+        <h4>댓글 <span id="commentCount" th:text="${#lists.size(comments)}">0</span>개</h4>
+        <div th:if="${!board.isExpired()}" id="commentForm" class="comment-form">
+            <div class="mb-3">
+                <textarea id="commentContent" class="form-control" rows="3" placeholder="댓글을 입력하세요 (최대 100바이트)"></textarea>
+                <div id="commentCounter" class="char-counter">0/100 bytes</div>
+            </div>
+            <div class="mb-3">
+                <input type="text" id="commentWriter" class="form-control" placeholder="작성자">
+            </div>
+            <button type="button" id="commentSubmitBtn" class="btn btn-primary" onclick="submitComment()">댓글 작성</button>
+            <div id="commentMessage" style="display: none;"></div>
+        </div>
+        <div th:if="${board.isExpired()}" class="alert alert-warning text-center"><strong>마감된 게시글입니다.</strong> 더 이상 댓글을 작성할 수 없습니다.</div>
+        <div class="mt-4" id="commentsList">
+            <div th:if="${#lists.isEmpty(comments)}" class="no-comments">아직 댓글이 없습니다.</div>
+            <div th:each="comment : ${comments}" class="comment-item" th:data-comment-id="${comment.id}">
+                <div class="comment-header">
+                    <span class="comment-writer" th:text="${comment.writer}"></span>
+                    <div>
+                        <span class="comment-date" th:text="${#temporals.format(comment.createdAt, 'yyyy-MM-dd HH:mm')}"></span>
+                        <button type="button" class="btn btn-sm btn-outline-danger ms-2" th:onclick="'deleteComment(' + ${comment.id} + ')'">삭제</button>
+                    </div>
+                </div>
+                <div class="comment-content" th:text="${comment.content}"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script th:src="|//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoJsApiKey}&libraries=services|"></script>
+<script th:inline="javascript">
+    const boardData = {
+        id: /*[[${board.id}]]*/ null,
+        latitude: /*[[${board.latitude}]]*/ null,
+        longitude: /*[[${board.longitude}]]*/ null,
+        locationName: /*[[${board.locationName}]]*/ null,
+        region: /*[[${board.region}]]*/ '지역 정보 없음',
+        remainingMinutes: /*[[${board.getRemainingMinutes()}]]*/ 0
+    };
+
+    function getByteLength(str) { return new Blob([str], {type: 'text/plain'}).size; }
+    function removeAllChildNods(el) { while (el.hasChildNodes()) el.removeChild(el.lastChild); }
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    kakao.maps.load(function() {
+        // --- 변수 ---
+        let map, infowindow, ps;
+        let mainMarker, myLocationMarker, myLocationCircle;
+        let nearbyMarkers = [], searchedPlaces = [], currentActiveMarker = null;
+        let currentPage = 1, totalPage = 1;
+        let userLocation = null, currentSearchRadius = 500;
+
+        // --- 초기화 ---
+        function initialize() {
+            infowindow = new kakao.maps.InfoWindow({zIndex:1, removable: true});
+            ps = new kakao.maps.services.Places();
+            const mapContainer = document.getElementById('map');
+
+            if (boardData.latitude == null || boardData.longitude == null) {
+                const mapSection = document.getElementById('map-section');
+                if(mapSection) mapSection.innerHTML = '<div class="text-center py-5 text-muted bg-light rounded w-100">이 게시글에는 지도 위치 정보가 없습니다.</div>';
+                return;
+            }
+
+            const mapOption = { center: new kakao.maps.LatLng(boardData.latitude, boardData.longitude), level: 5 };
+            map = new kakao.maps.Map(mapContainer, mapOption);
+
+            const mainPosition = new kakao.maps.LatLng(boardData.latitude, boardData.longitude);
+            mainMarker = new kakao.maps.Marker({
+                position: mainPosition,
+                image: new kakao.maps.MarkerImage('http://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png', new kakao.maps.Size(31, 35))
+            });
+            mainMarker.setMap(map);
+
+            const iwContent = `<div class="info"><div class="title" style="color:red;">(모집장소) ${boardData.locationName || boardData.region}</div></div>`;
+            infowindow.setContent(iwContent);
+            infowindow.open(map, mainMarker);
+
+            // 이벤트 리스너 연결
+            document.getElementById('nearby-keyword').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); searchNearby(1); }
+            });
+            const commentTextarea = document.getElementById('commentContent');
+            if (commentTextarea) {
+                commentTextarea.addEventListener('input', checkCommentLength);
+                checkCommentLength();
+            }
+            updateCountdown();
+            updateCommentCount();
+        }
+
+        // --- 지도 기능 함수 ---
+        window.searchNearby = function(page) {
+            currentPage = page;
+            const keyword = document.getElementById('nearby-keyword').value.trim();
+            if (!keyword) { alert('주변에서 찾을 장소 키워드를 입력해주세요.'); return; }
+
+            const searchOptions = { location: mainMarker.getPosition(), radius: 2000, page: currentPage };
+            ps.keywordSearch(keyword, (data, status, pagination) => {
+                if (status === kakao.maps.services.Status.OK) {
+                    searchedPlaces = data;
+                    displayNearbyPlaces(data);
+                    renderPagination(pagination);
+                } else {
+                    alert('주변 검색 결과가 없습니다.');
+                }
+            }, searchOptions);
+        }
+
+        function displayNearbyPlaces(places) {
+            const listEl = document.getElementById('placesList');
+            removeAllChildNods(listEl);
+            clearNearbyMarkers();
+            const bounds = new kakao.maps.LatLngBounds();
+            bounds.extend(mainMarker.getPosition());
+
+            places.forEach((place, i) => {
+                const placePosition = new kakao.maps.LatLng(place.y, place.x);
+                const marker = addNearbyMarker(placePosition, i, place.id);
+                const itemEl = getListItem(i, place);
+                bounds.extend(placePosition);
+
+                itemEl.onmouseover = () => {
+                    if (currentActiveMarker !== marker) marker.setImage(marker.hoverImage);
+                    infowindow.setContent(`<div class="info"><div class="title">${place.place_name}</div></div>`);
+                    infowindow.open(map, marker);
+                };
+                itemEl.onmouseout = () => {
+                    if (currentActiveMarker !== marker) marker.setImage(marker.normalImage);
+                    infowindow.close();
+                };
+                itemEl.onclick = () => {
+                    if (currentActiveMarker && currentActiveMarker !== marker) {
+                        currentActiveMarker.setImage(currentActiveMarker.normalImage);
+                    }
+                    marker.setImage(marker.hoverImage);
+                    map.panTo(marker.getPosition());
+                    currentActiveMarker = marker;
+                    highlightListItem(place.id);
+                };
+                listEl.appendChild(itemEl);
+            });
+            map.setBounds(bounds);
+        }
+
+        function getListItem(index, place) {
+            const el = document.createElement('li');
+            el.dataset.placeId = place.id;
+            el.innerHTML = `<div class="p-2">
+                                <h6 class="mb-0">${index + 1}. ${place.place_name}</h6>
+                                <small class="text-muted">${place.road_address_name || place.address_name}</small>
+                            </div>`;
+            return el;
+        }
+
+        function addNearbyMarker(position, idx, placeId) {
+            const normalImageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_number_blue.png',
+                hoverImageSrc = 'http://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png',
+                imageSize = new kakao.maps.Size(36, 37),
+                hoverImageSize = new kakao.maps.Size(31, 35);
+            const normalImgOptions = { spriteSize: new kakao.maps.Size(36, 691), spriteOrigin: new kakao.maps.Point(0, (idx * 46) + 10), offset: new kakao.maps.Point(13, 37) };
+            const markerImageNormal = new kakao.maps.MarkerImage(normalImageSrc, imageSize, normalImgOptions);
+            const markerImageHover = new kakao.maps.MarkerImage(hoverImageSrc, hoverImageSize, { offset: new kakao.maps.Point(13, 34) });
+
+            const marker = new kakao.maps.Marker({ position: position, image: markerImageNormal });
+            marker.normalImage = markerImageNormal;
+            marker.hoverImage = markerImageHover;
+            marker.placeId = placeId;
+            marker.setMap(map);
+            nearbyMarkers.push(marker);
+            return marker;
+        }
+
+        function clearNearbyMarkers() {
+            nearbyMarkers.forEach(m => m.setMap(null));
+            nearbyMarkers = [];
+            currentActiveMarker = null;
+        }
+
+        function highlightListItem(placeId) {
+            document.querySelectorAll('#placesList li.highlighted').forEach(el => el.classList.remove('highlighted'));
+            const itemEl = document.querySelector(`#placesList li[data-place-id="${placeId}"]`);
+            if (itemEl) itemEl.classList.add('highlighted');
+        }
+
+        function renderPagination(pagination) {
+            totalPage = pagination.last;
+            document.getElementById('pageInfo').textContent = `${pagination.current} / ${totalPage}`;
+            document.getElementById('prevBtn').disabled = !pagination.hasPrevPage;
+            document.getElementById('nextBtn').disabled = !pagination.hasNextPage;
+        }
+
+        window.movePage = function(delta) {
+            const newPage = currentPage + delta;
+            if (newPage > 0 && newPage <= totalPage) { searchNearby(newPage); }
+        }
+
+        function getUserLocation(callback) {
+            if (userLocation) { callback(null, userLocation); return; }
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    position => {
+                        userLocation = new kakao.maps.LatLng(position.coords.latitude, position.coords.longitude);
+                        callback(null, userLocation);
+                    },
+                    () => {
+                        alert("위치 정보를 가져오는 데 실패했습니다.");
+                        callback(new Error("Geolocation failed."));
+                    }
+                );
+            } else {
+                alert("이 브라우저에서는 Geolocation을 지원하지 않습니다.");
+                callback(new Error("Geolocation not supported."));
+            }
+        }
+
+        window.displayMyLocation = function() {
+            getUserLocation((err, locPosition) => {
+                if (err) return;
+                if (myLocationMarker) myLocationMarker.setMap(null);
+                myLocationMarker = new kakao.maps.Marker({
+                    map: map,
+                    position: locPosition,
+                    image: new kakao.maps.MarkerImage('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png', new kakao.maps.Size(24, 35))
+                });
+                if (myLocationCircle) myLocationCircle.setMap(null);
+                myLocationCircle = new kakao.maps.Circle({ map: map, center: locPosition, radius: currentSearchRadius, strokeWeight: 2, strokeColor: '#004CFF', fillColor: '#CCE7FF', fillOpacity: 0.5 });
+
+                const bounds = new kakao.maps.LatLngBounds();
+                bounds.extend(locPosition);
+                if (mainMarker) bounds.extend(mainMarker.getPosition());
+                map.setBounds(bounds);
+            });
+        }
+
+        window.changeSearchRadius = function() {
+            currentSearchRadius = parseInt(document.getElementById('radiusSelect').value, 10);
+            if (myLocationCircle) {
+                myLocationCircle.setRadius(currentSearchRadius);
+            }
+        }
+
+        // --- 기존 페이지 기능 함수들 ---
+        window.checkCommentLength = function() {
+            const textarea = document.getElementById('commentContent');
+            const counter = document.getElementById('commentCounter');
+            if (!textarea || !counter) return;
+            const text = textarea.value;
+            const byteLength = getByteLength(text);
+            counter.textContent = byteLength + '/100 bytes';
+            counter.classList.toggle('over-limit', byteLength > 100);
+            textarea.classList.toggle('is-invalid', byteLength > 100);
+        }
+
+        window.submitComment = async function() {
+            const content = document.getElementById('commentContent');
+            const writer = document.getElementById('commentWriter');
+            if (!content.value.trim()) { alert('댓글 내용을 입력해주세요.'); return; }
+            if (getByteLength(content.value) > 100) { alert('댓글은 100바이트를 초과할 수 없습니다.'); return; }
+            if (!writer.value.trim()) { alert('작성자를 입력해주세요.'); return; }
+
+            const formData = new FormData();
+            formData.append('boardId', boardData.id);
+            formData.append('content', content.value);
+            formData.append('writer', writer.value);
+
+            try {
+                const response = await fetch('/api/board/comment', { method: 'POST', body: formData });
+                const result = await response.json();
+                if (result.success) {
+                    addCommentToList(result.comment);
+                    content.value = ''; writer.value = ''; checkCommentLength(); updateCommentCount();
+                    showMessage('댓글이 성공적으로 작성되었습니다.', 'success');
+                } else {
+                    showMessage(result.message, 'error');
+                }
+            } catch (error) {
+                showMessage('댓글 작성 중 오류가 발생했습니다.', 'error');
+            }
+        }
+
+        function addCommentToList(comment) {
+            const commentsList = document.getElementById('commentsList');
+            const noCommentsDiv = document.querySelector('.no-comments');
+            if (noCommentsDiv) noCommentsDiv.remove();
+
+            const commentHtml = `
+                <div class="comment-item new-comment" data-comment-id="${comment.id}">
+                    <div class="comment-header">
+                        <span class="comment-writer">${escapeHtml(comment.writer)}</span>
+                        <div>
+                            <span class="comment-date">${comment.createdAt}</span>
+                            <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="deleteComment(${comment.id})">삭제</button>
+                        </div>
+                    </div>
+                    <div class="comment-content">${escapeHtml(comment.content)}</div>
+                </div>`;
+            commentsList.insertAdjacentHTML('beforeend', commentHtml);
+        }
+
+        window.deleteComment = async function(commentId) {
+            if (!confirm('댓글을 삭제하시겠습니까?')) return;
+            try {
+                const response = await fetch(`/api/board/comment/${commentId}`, { method: 'DELETE' });
+                const result = await response.json();
+                if (result.success) {
+                    const commentElement = document.querySelector(`[data-comment-id="${commentId}"]`);
+                    if (commentElement) commentElement.remove();
+                    updateCommentCount();
+                    showMessage('댓글이 삭제되었습니다.', 'success');
+                } else {
+                    showMessage(result.message, 'error');
+                }
+            } catch (error) {
+                showMessage('댓글 삭제 중 오류가 발생했습니다.', 'error');
+            }
+        }
+
+        function updateCommentCount() {
+            const count = document.querySelectorAll('#commentsList .comment-item').length;
+            document.getElementById('commentCount').textContent = count;
+            if (count === 0 && !document.querySelector('.no-comments')) {
+                document.getElementById('commentsList').innerHTML = '<div class="no-comments">아직 댓글이 없습니다.</div>';
+            }
+        }
+
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('commentMessage');
+            if (!messageDiv) return;
+            messageDiv.className = type === 'success' ? 'text-success' : 'text-danger';
+            messageDiv.textContent = message;
+            messageDiv.style.display = 'block';
+            setTimeout(() => { messageDiv.style.display = 'none'; }, 3000);
+        }
+
+        function updateCountdown() {
+            const countdownEl = document.getElementById('countdown');
+            const deadlineInfoEl = document.getElementById('deadlineInfo');
+            if (!countdownEl) return;
+            let remainingMinutes = boardData.remainingMinutes;
+            if (remainingMinutes <= 0) {
+                deadlineInfoEl.className = 'deadline-info deadline-expired';
+                countdownEl.innerHTML = '<span class="expired-message">마감되었습니다</span>';
+                document.getElementById('commentForm').style.display = 'none';
+                return;
+            }
+            const deadlineTime = new Date().getTime() + remainingMinutes * 60 * 1000;
+            const interval = setInterval(() => {
+                const distance = deadlineTime - new Date().getTime();
+                if (distance < 0) {
+                    clearInterval(interval);
+                    updateCountdown(); // Refresh to show "expired"
+                    return;
+                }
+                const hours = Math.floor(distance / (1000*60*60));
+                const minutes = Math.floor((distance % (1000*60*60)) / (1000*60));
+                const seconds = Math.floor((distance % (1000*60)) / 1000);
+                countdownEl.innerHTML = `<span class="countdown-display">${hours}시간 ${minutes}분 ${seconds}초 남음</span>`;
+                if (hours === 0 && minutes < 30) deadlineInfoEl.className = 'deadline-info deadline-soon';
+            }, 1000);
+        }
+
+        // --- 초기화 실행 ---
+        initialize();
+    });
+</script>
+</body>
+</html>

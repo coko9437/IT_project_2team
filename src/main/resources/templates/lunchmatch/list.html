@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org" style="height: 100%;">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>부산 맛집 찾아떠나기 (지도 연동)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <script th:inline="javascript">
+    // Thymeleaf의 th:inline="javascript"를 사용하여 서버의 모델 데이터를 JavaScript 변수로 가져옵니다.
+    // 컨트롤러에서 model.addAttribute("kakaoJsApiKey", kakaoJavascriptApiKey); 로 전달된 값입니다.
+    const KAKAO_JAVASCRIPT_API_KEY = /*[[${kakaoJsApiKey}]]*/ 'YOUR_DEFAULT_KEY';
+
+    // 디버깅을 위해 콘솔에 키 값 출력 (배포 시에는 제거하거나 주석 처리 권장)
+    console.log("카카오 JavaScript API 키 (HTML에 주입됨):", KAKAO_JAVASCRIPT_API_KEY);
+  </script>
+
+  <script th:src="|//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoJsApiKey}&libraries=services,drawing|"></script>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    body { font-family: 'Noto Sans KR', 'Inter', sans-serif; display: flex; flex-direction: column; }
+    .card-fade-in { animation: fadeIn 0.5s ease-in-out; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    #fullscreen-map-modal {
+      transition: opacity 0.3s ease-in-out;
+    }
+    #map {
+      width: 100%;
+      height: 600px;
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      overflow: hidden;
+    }
+    /* 인포윈도우 기본 스타일 */
+    .info {
+      padding: 5px;
+      border-radius: 5px;
+      background: #fff;
+      border: 1px solid #ccc;
+      box-shadow: 0 2px 2px rgba(0,0,0,0.1);
+      white-space: nowrap;
+    }
+    .info .title {
+      font-weight: bold;
+      font-size: 14px;
+      color: #333;
+    }
+    /* 하이라이트 스타일 추가 */
+    .highlighted {
+      background-color: #e0f2fe !important; /* Tailwind bg-blue-100 */
+    }
+  </style>
+</head>
+<body class="bg-gray-50">
+
+<div class="container mx-auto p-4 md:p-8 max-w-7xl flex flex-col flex-grow">
+  <header class="text-center my-8 flex-shrink-0">
+    <div class="flex justify-between items-center mb-8">
+      <h1 class="text-4xl md:text-5xl font-bold text-gray-800">
+        내가 저장한 맛집 🍱
+      </h1>
+      <a href="/lunchmatch/map" class="bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600 transition duration-300">
+        지도에서 맛집 찾기
+      </a>
+    </div>
+    <p class="text-gray-500 mt-2">저장한 맛집들을 지도와 함께 만나보세요!</p>
+  </header>
+
+  <main class="grid grid-cols-1 lg:grid-cols-2 gap-8 flex-grow min-h-0">
+    <div class="flex flex-col h-full overflow-hidden">
+      <div class="bg-white p-4 rounded-lg shadow-md mb-6 flex-shrink-0">
+        <form id="searchForm" onsubmit="event.preventDefault(); fetchRestaurantsAndDisplay();" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+          <div class="md:col-span-2">
+            <label for="keyword" class="block text-sm font-medium text-gray-700">검색어 (이름 또는 주소)</label>
+            <input type="text" id="keyword" name="keyword" th:value="${keyword}" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" placeholder="검색어를 입력하세요">
+          </div>
+          <div>
+            <label for="category" class="block text-sm font-medium text-gray-700">음식 종류</label>
+            <select id="category" name="category" onchange="fetchRestaurantsAndDisplay()" class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+              <option value="">전체</option>
+              <option value="한식" th:selected="${category == '한식'}">한식</option>
+              <option value="중식" th:selected="${category == '중식'}">중식</option>
+              <option value="일식" th:selected="${category == '일식'}">일식</option>
+              <option value="양식" th:selected="${category == '양식'}">양식</option>
+              <option value="카페" th:selected="${category == '카페'}">카페</option>
+              <option value="분식" th:selected="${category == '분식'}">분식</option>
+            </select>
+          </div>
+          <div>
+            <label for="orderBy" class="block text-sm font-medium text-gray-700">정렬 기준</label>
+            <select id="orderBy" name="orderBy" onchange="applySortingAndDisplay()" class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+              <option value="latest" th:selected="${orderBy == 'latest'}">최신순</option>
+              <option value="name" th:selected="${orderBy == 'name'}">이름순</option>
+              <option value="rating_desc" th:selected="${orderBy == 'rating_desc'}">평점 높은 순</option>
+              <option value="distance" th:selected="${orderBy == 'distance'}">거리순</option>
+            </select>
+          </div>
+          <div>
+            <button type="submit" class="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition duration-300">
+              검색하기
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="border-t border-gray-200 pt-8 flex-grow overflow-y-auto">
+        <h2 class="text-2xl font-semibold text-gray-700 mb-6">✨ 맛집 목록</h2>
+        <div id="restaurant-list" class="space-y-4">
+        </div>
+      </div>
+    </div>
+
+    <div class="relative rounded-lg shadow-md overflow-hidden" id="map-container">
+      <div id="map"></div>
+      <button onclick="openFullScreenMap()" class="absolute top-2 right-2 bg-white text-gray-700 font-semibold py-2 px-4 rounded-full shadow-lg z-10 hover:bg-gray-200 transition">
+        전체 지도 보기
+      </button>
+      <button onclick="displayMyLocation()" class="absolute top-14 right-2 bg-white p-2 rounded-full shadow-lg z-10 hover:bg-gray-200">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+      </button>
+      <div class="absolute top-2 left-2 z-10">
+        <label for="radiusSelect" class="sr-only">반경 선택</label>
+        <select id="radiusSelect" onchange="changeSearchRadius()" class="bg-white text-gray-700 text-sm py-2 px-3 rounded-md shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="500">500m</option>
+          <option value="1000">1km</option>
+          <option value="2000">2km</option>
+          <option value="5000">5km</option>
+          <option value="10000">10km</option>
+        </select>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="fullscreen-map-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center opacity-0 pointer-events-none">
+  <div class="relative w-11/12 h-5/6 bg-white rounded-lg shadow-2xl p-4">
+    <div id="fullscreen-map" class="w-full h-full rounded-lg"></div>
+    <button onclick="closeFullScreenMap()" class="absolute top-4 right-4 bg-white text-gray-800 font-bold py-2 px-4 rounded-full shadow-xl hover:bg-gray-200 transition z-10">
+      닫기
+    </button>
+  </div>
+</div>
+
+<script>
+  let map;
+  let modalMap;
+  let markers = []; // 맛집 마커들을 관리하는 배열
+  let infowindow = new kakao.maps.InfoWindow({zIndex:1}); // 단일 정보창 인스턴스
+
+  let userLocation = null;
+  let myLocationMarker = null; // 내 위치 마커
+  let myLocationCircle = null; // 내 위치 반경 원
+  let currentSearchRadius = 500;
+
+  let currentActiveMarker = null; // 현재 지도에서 활성화된 마커 (마우스 오버/클릭)
+
+  let restaurantsFromServer = []; // AJAX로 받아온 맛집 데이터
+
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOMContentLoaded 이벤트 발생.');
+
+    const mapContainer = document.getElementById('map');
+    const mapOption = {
+      center: new kakao.maps.LatLng(35.1795543, 129.0756416), // 초기 지도 중심 (부산시청)
+      level: 5 // 초기 지도 확대 레벨
+    };
+    map = new kakao.maps.Map(mapContainer, mapOption);
+
+    // 페이지 로드 시, 백엔드 API를 호출하여 맛집 목록을 가져와 표시합니다.
+    fetchRestaurantsAndDisplay();
+  });
+
+  // 맛집 목록 데이터 가져오기 및 표시 (메인 로직)
+  async function fetchRestaurantsAndDisplay() {
+    const keyword = document.getElementById('keyword').value;
+    const category = document.getElementById('category').value;
+    const orderBy = document.getElementById('orderBy').value;
+    const minRating = null;
+
+    const queryParams = new URLSearchParams({
+      keyword: keyword,
+      category: category,
+      orderBy: orderBy === 'distance' ? 'latest' : orderBy, // 'distance'는 클라이언트 정렬이므로 서버에는 'latest'로 요청
+    }).toString();
+
+    try {
+      const response = await fetch(`/lunchmatch/api/list?${queryParams}`); // 백엔드 API 호출
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('맛집 목록 API 서버 호출 실패:', response.status, errorText);
+        throw new Error(`맛집 목록 API 서버 호출 실패: ${response.status}`);
+      }
+      restaurantsFromServer = await response.json(); // JSON 데이터를 변수에 할당
+      console.log('--- Debug: fetch 후 restaurantsFromServer 값 (AJAX 응답) ---', restaurantsFromServer);
+
+      // 데이터가 준비되면 정렬을 적용하고 지도 및 목록을 업데이트합니다.
+      applySortingAndDisplay(); // 이 함수 내에서 setMarkersOnMap과 displayRestaurantListHtml 호출
+
+      // 맛집이 있을 경우, 모든 마커를 포함하는 지도로 이동
+      if (restaurantsFromServer.length > 0) {
+        const bounds = new kakao.maps.LatLngBounds();
+        restaurantsFromServer.forEach(resto => {
+          if (typeof resto.latitude === 'number' && typeof resto.longitude === 'number' && resto.latitude !== null && resto.longitude !== null) {
+            bounds.extend(new kakao.maps.LatLng(resto.latitude, resto.longitude));
+          }
+        });
+        if (!bounds.isEmpty()) {
+          map.setBounds(bounds);
+        }
+      }
+
+    } catch (error) {
+      console.error('맛집 데이터를 가져오거나 표시하는 중 오류 발생:', error);
+      alert('맛집 데이터를 가져오는 중 오류가 발생했습니다. 자세한 내용은 콘솔을 확인해주세요.');
+      restaurantsFromServer = [];
+      setMarkersOnMap([], map); // 지도에서도 마커 제거
+      document.getElementById('restaurant-list').innerHTML = '<div class="text-center py-12"><p class="text-lg text-gray-500">맛집 데이터를 불러오는데 실패했습니다.</p></div>';
+    }
+  }
+
+  // 정렬 적용 및 지도/목록 업데이트
+  function applySortingAndDisplay() {
+    const sortCriteria = document.getElementById('orderBy').value;
+    let processedRestaurants = [...restaurantsFromServer]; // 원본 데이터 복사
+
+    if (sortCriteria === 'distance') {
+      getUserLocation((errorOccurred) => {
+        if (errorOccurred) {
+          document.getElementById('orderBy').value = 'latest';
+          alert("거리순 정렬을 위해 위치 정보를 가져올 수 없습니다. 최신순으로 정렬합니다.");
+          applySortingAndDisplay();
+          return;
+        }
+        updateRestaurantDistances(processedRestaurants);
+        processedRestaurants.sort((a, b) => {
+          // 거리가 null이거나 NaN인 경우를 맨 뒤로 보냄
+          if (a.distance === null || isNaN(a.distance)) return 1;
+          if (b.distance === null || isNaN(b.distance)) return -1;
+          return a.distance - b.distance;
+        });
+
+        console.log('--- Debug: 거리순 정렬 후 맛집 목록:', processedRestaurants);
+
+        setMarkersOnMap(processedRestaurants, map);
+        displayRestaurantListHtml(processedRestaurants);
+      });
+    } else {
+      if (sortCriteria === 'name') {
+        processedRestaurants.sort((a, b) => a.name.localeCompare(b.name));
+      } else if (sortCriteria === 'rating_desc') {
+        processedRestaurants.sort((a, b) => {
+          const ratingA = a.rating === null ? -1 : a.rating;
+          const ratingB = b.rating === null ? -1 : b.rating;
+          return ratingB - ratingA;
+        });
+      }
+
+      setMarkersOnMap(processedRestaurants, map);
+      displayRestaurantListHtml(processedRestaurants);
+    }
+  }
+
+
+  // 맛집 목록을 HTML로 동적으로 렌더링하는 함수
+  function displayRestaurantListHtml(restaurants) {
+    const listEl = document.getElementById('restaurant-list');
+    while (listEl.firstChild) {
+      listEl.removeChild(listEl.firstChild);
+    }
+
+    if (!restaurants || restaurants.length === 0) {
+      listEl.innerHTML = '<div class="text-center py-12"><p class="text-lg text-gray-500">조건에 맞는 맛집이 없습니다.</p></div>';
+      return;
+    }
+
+    restaurants.forEach((match, index) => {
+      const el = document.createElement('div');
+      el.className = `bg-white rounded-lg shadow-md overflow-hidden transform hover:shadow-xl transition-shadow duration-300 card-fade-in flex`;
+      el.style.animationDelay = `${index * 100}ms`;
+      el.dataset.rno = match.rno;
+
+      let categoryParts = ['맛집'];
+      if (match.category) {
+        const parts = match.category.split('>');
+        if (parts.length > 0) {
+          categoryParts = [parts[parts.length - 1].trim()];
+        }
+      }
+      const imageText = categoryParts[0];
+
+      // 거리 정보는 updateRestaurantDistances에서 이미 match 객체에 distance 속성으로 추가되어 있음
+      const distanceDisplay = (match.distance !== undefined && match.distance !== null && !isNaN(match.distance)) ?
+              `<span class="text-xs font-semibold ${match.distance * 1000 <= currentSearchRadius ? 'text-red-500' : 'text-blue-500'}">거리: ${match.distance.toFixed(2)}km</span>` :
+              '<span class="text-xs text-gray-500">거리: 계산 불가</span>';
+
+      el.innerHTML = `
+            <div class="w-32 h-32 bg-gray-200 flex-shrink-0 flex items-center justify-center">
+              <span class="text-gray-500 text-lg font-bold">${imageText}</span>
+            </div>
+            <div class="p-4 flex flex-col justify-between flex-grow">
+              <div>
+                <div class="flex justify-between items-start">
+                  <h3 class="text-lg font-semibold text-gray-800">${match.name}</h3>
+                  ${match.rating != null ? `<span class="text-sm font-bold text-yellow-500 flex-shrink-0 ml-2">⭐ ${match.rating}</span>` : ''}
+                </div>
+                <p class="text-sm text-gray-600 mt-1">${match.address}</p>
+                ${distanceDisplay}
+              </div>
+              <div class="mt-2 text-right">
+                <a href="/lunchmatch/read/${match.rno}" class="text-sm bg-blue-500 text-white py-1 px-3 rounded-md hover:bg-blue-600 transition-colors">
+                  상세보기
+                </a>
+              </div>
+            </div>
+          `;
+      listEl.appendChild(el);
+
+      el.onmouseover = () => {
+        const targetMarker = markers.find(m => m.placeRno === match.rno);
+        if (targetMarker) {
+          if (currentActiveMarker && currentActiveMarker !== targetMarker) {
+            currentActiveMarker.setImage(currentActiveMarker.normalImage);
+          }
+          targetMarker.setImage(targetMarker.hoverImage);
+          infowindow.setContent(`<div class="info"><div class="title">${match.name}</div></div>`);
+          infowindow.open(map, targetMarker); // map 대신 targetMap으로 수정 (전체 지도 보기시)
+        }
+      };
+      el.onmouseout = () => {
+        const targetMarker = markers.find(m => m.placeRno === match.rno);
+        if (targetMarker && currentActiveMarker !== targetMarker) {
+          currentActiveMarker = null;
+          targetMarker.setImage(targetMarker.normalImage);
+          infowindow.close();
+        }
+      };
+      el.onclick = (event) => {
+        if (event.target.tagName === 'BUTTON' || event.target.closest('a')) return;
+
+        const targetMarker = markers.find(m => m.placeRno === match.rno);
+        if (targetMarker) {
+          if (currentActiveMarker && currentActiveMarker !== targetMarker) {
+            currentActiveMarker.setImage(currentActiveMarker.normalImage);
+          }
+          targetMarker.setImage(targetMarker.hoverImage);
+          currentActiveMarker = targetMarker;
+          map.panTo(targetMarker.getPosition());
+          infowindow.setContent(`<div class="info"><div class="title">${match.name}</div></div>`);
+          infowindow.open(map, targetMarker);
+          highlightListItem(match.rno); // 목록 하이라이트
+        }
+      };
+    });
+  }
+
+
+  function setMarkersOnMap(restaurants, targetMap) {
+    for (let i = 0; i < markers.length; i++) {
+      markers[i].setMap(null);
+    }
+    markers = [];
+    currentActiveMarker = null;
+    infowindow.close();
+
+    console.log('--- Debug: setMarkersOnMap 호출됨. 전달된 맛집 수:', restaurants.length);
+    console.log('--- Debug: setMarkersOnMap 전달된 맛집 목록:', restaurants);
+
+    restaurants.forEach((resto, index) => {
+      console.log('--- Debug: 개별 맛집 객체 마커 생성 시도:', resto);
+      if (typeof resto.latitude === 'number' && typeof resto.longitude === 'number' && resto.latitude !== null && resto.longitude !== null) {
+        const coords = new kakao.maps.LatLng(resto.latitude, resto.longitude);
+
+        const normalImageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_number_blue.png';
+        const imageSize = new kakao.maps.Size(36, 37);
+        const normalImgOptions = { spriteSize: new kakao.maps.Size(36, 691), spriteOrigin: new kakao.maps.Point(0, (index < 10 ? index * 46 + 10 : 0)), offset: new kakao.maps.Point(13, 37) };
+        const markerImageNormal = new kakao.maps.MarkerImage(normalImageSrc, imageSize, normalImgOptions);
+
+        const hoverImageSrc = 'http://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png';
+        const hoverImageSize = new kakao.maps.Size(31, 35);
+        const hoverImgOptions = { offset: new kakao.maps.Point(13, 34) };
+        const markerImageHover = new kakao.maps.MarkerImage(hoverImageSrc, hoverImageSize, hoverImgOptions);
+
+        const marker = new kakao.maps.Marker({
+          position: coords,
+          image: markerImageNormal
+        });
+        marker.normalImage = markerImageNormal;
+        marker.hoverImage = markerImageHover;
+        marker.placeRno = resto.rno;
+        marker.placeName = resto.name;
+
+        marker.setMap(targetMap);
+        markers.push(marker);
+
+        kakao.maps.event.addListener(marker, 'mouseover', () => {
+          if (currentActiveMarker && currentActiveMarker !== marker) {
+            currentActiveMarker.setImage(currentActiveMarker.normalImage);
+          }
+          marker.setImage(marker.hoverImage);
+          infowindow.setContent(`<div class="info"><div class="title">${marker.placeName}</div></div>`);
+          infowindow.open(targetMap, marker);
+        });
+        kakao.maps.event.addListener(marker, 'mouseout', () => {
+          if (currentActiveMarker && currentActiveMarker !== marker) {
+            currentActiveMarker = null;
+            marker.setImage(marker.normalImage);
+          }
+          infowindow.close();
+        });
+        kakao.maps.event.addListener(marker, 'click', () => {
+          if (currentActiveMarker && currentActiveMarker !== marker) {
+            currentActiveMarker.setImage(currentActiveMarker.normalImage);
+          }
+          marker.setImage(marker.hoverImage);
+          currentActiveMarker = marker;
+          map.panTo(marker.getPosition());
+          infowindow.setContent(`<div class="info"><div class="title">${marker.placeName}</div></div>`);
+          infowindow.open(targetMap, marker);
+          highlightListItem(marker.placeRno);
+        });
+
+      } else {
+        console.warn('--- Debug: 맛집 데이터에 유효한 위도/경도 정보가 없습니다. 마커 생성 건너뜀:', resto.name, '위도:', resto.latitude, '경도:', resto.longitude);
+      }
+    });
+  }
+
+  function highlightListItem(rno) {
+    document.querySelectorAll('#restaurant-list .highlighted').forEach(el => {
+      el.classList.remove('highlighted');
+      el.style.backgroundColor = '';
+    });
+    const itemEl = document.querySelector(`#restaurant-list div[data-rno="${rno}"]`);
+    if (itemEl) {
+      itemEl.classList.add('highlighted');
+      itemEl.style.backgroundColor = '#e0f2fe';
+      itemEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+
+
+  function getUserLocation(callback) {
+    if (userLocation) {
+      if (callback) callback();
+      return;
+    }
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(position => {
+        userLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
+        if (callback) callback();
+      }, error => {
+        console.error("위치 정보를 가져오는 데 실패했습니다.", error);
+        alert("현재 위치를 가져올 수 없습니다. 브라우저 설정에서 위치 정보 접근을 허용해주세요.");
+        if (callback) callback(true);
+      }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+    } else {
+      alert("이 브라우저에서는 Geolocation을 지원하지 않습니다.");
+      if (callback) callback(true);
+    }
+  }
+
+  function displayMyLocation() {
+    getUserLocation((errorOccurred) => {
+      if (!errorOccurred && userLocation) {
+        const locPosition = new kakao.maps.LatLng(userLocation.lat, userLocation.lng);
+
+        if (myLocationMarker) myLocationMarker.setMap(null);
+        if (myLocationCircle) myLocationCircle.setMap(null);
+
+        myLocationMarker = new kakao.maps.Marker({
+          map: map,
+          position: locPosition,
+          image: new kakao.maps.MarkerImage(
+                  'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
+                  new kakao.maps.Size(24, 35),
+                  { offset: new kakao.maps.Point(12, 35) }
+          )
+        });
+
+        myLocationCircle = new kakao.maps.Circle({
+          map: map,
+          center: locPosition,
+          radius: currentSearchRadius,
+          strokeWeight: 2,
+          strokeColor: '#004CFF',
+          strokeOpacity: 0.8,
+          strokeStyle: 'dashed',
+          fillColor: '#CCE7FF',
+          fillOpacity: 0.5
+        });
+
+        map.setCenter(locPosition);
+        map.setLevel(calculateLevelForRadius(currentSearchRadius));
+
+        const infowindow = new kakao.maps.InfoWindow({
+          content: '<div style="padding:5px;font-size:12px;">현재 내 위치</div>',
+          position: locPosition
+        });
+        infowindow.open(map, myLocationMarker);
+
+        updateRestaurantDistances(restaurantsFromServer);
+      }
+    });
+  }
+
+  function changeSearchRadius() {
+    currentSearchRadius = parseInt(document.getElementById('radiusSelect').value);
+    if (userLocation) {
+      displayMyLocation();
+    }
+  }
+
+  function calculateLevelForRadius(radius) {
+    if (radius <= 500) return 4;
+    if (radius <= 1000) return 5;
+    if (radius <= 2000) return 6;
+    if (radius <= 5000) return 7;
+    if (radius <= 10000) return 8;
+    return 9;
+  }
+
+  function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = deg2rad(lat2 - lat1);
+    const dLon = deg2rad(lon2 - lon1);
+    const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+  function deg2rad(deg) { return deg * (Math.PI / 180); }
+
+  function updateRestaurantDistances(restaurants) {
+    console.log('--- Debug: updateRestaurantDistances 호출됨. 대상 맛집 수:', restaurants.length);
+    if (!userLocation) {
+      console.log('--- Debug: userLocation이 없어 거리 업데이트 건너뜀.');
+      // HTML 요소에 거리 정보를 숨기거나 지우기
+      document.querySelectorAll('#restaurant-list .distance-info').forEach(itemEl => {
+        itemEl.textContent = '';
+        itemEl.style.fontWeight = 'normal';
+        itemEl.style.color = 'inherit';
+      });
+      return restaurants; // userLocation 없으면 원본 배열 그대로 반환
+    }
+
+    restaurants.forEach(resto => {
+      const lat = parseFloat(resto.latitude);
+      const lng = parseFloat(resto.longitude);
+
+      console.log(`--- Debug: ${resto.name} - 위도: ${resto.latitude}, 경도: ${resto.longitude} -> 파싱 후: ${lat}, ${lng}`);
+
+      if (!isNaN(lat) && !isNaN(lng)) {
+        resto.distance = getDistance(userLocation.lat, userLocation.lng, lat, lng); // resto 객체에 직접 distance 속성 추가
+
+        // HTML 요소에 거리 정보 업데이트는 displayRestaurantListHtml에서 다시 렌더링될 때 반영됨
+        // 여기서는 데이터 객체에만 업데이트하고 HTML 업데이트는 displayRestaurantListHtml에 맡김
+      } else {
+        resto.distance = null; // 유효하지 않으면 distance도 null
+        console.warn('--- Debug: 맛집 데이터에 유효한 위도/경도 정보가 없어 거리 계산 건너뜀:', resto.name, '위도:', resto.latitude, '경도:', resto.longitude);
+      }
+    });
+    console.log('--- Debug: 거리 업데이트 완료.');
+    return restaurants; // 거리 정보가 추가된 배열을 반환
+  }
+
+  function openFullScreenMap() {
+    const modal = document.getElementById('fullscreen-map-modal');
+    modal.classList.remove('opacity-0', 'pointer-events-none');
+    const mapContainer = document.getElementById('fullscreen-map');
+
+    if (!modalMap) {
+      const mapOption = {
+        center: map.getCenter(),
+        level: map.getLevel()
+      };
+      modalMap = new kakao.maps.Map(mapContainer, mapOption);
+    }
+
+    setTimeout(() => {
+      modalMap.relayout();
+      setMarkersOnMap(restaurantsFromServer, modalMap);
+
+      if(userLocation) {
+        const locPosition = new kakao.maps.LatLng(userLocation.lat, userLocation.lng);
+        new kakao.maps.Marker({
+          map: modalMap,
+          position: locPosition,
+          image: new kakao.maps.MarkerImage(
+                  'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
+                  new kakao.maps.Size(24, 35),
+                  { offset: new kakao.maps.Point(12, 35) }
+          )
+        });
+        new kakao.maps.Circle({
+          map: modalMap,
+          center: locPosition,
+          radius: currentSearchRadius,
+          strokeWeight: 2,
+          strokeColor: '#004CFF',
+          strokeOpacity: 0.8,
+          strokeStyle: 'dashed',
+          fillColor: '#CCE7FF',
+          fillOpacity: 0.5
+        });
+      }
+
+      const allBounds = new kakao.maps.LatLngBounds();
+      markers.forEach(marker => allBounds.extend(marker.getPosition()));
+      if (userLocation) {
+        allBounds.extend(new kakao.maps.LatLng(userLocation.lat, userLocation.lng));
+      }
+      if (!allBounds.isEmpty()) {
+        modalMap.setBounds(allBounds);
+      }
+
+    }, 100);
+  }
+
+  function closeFullScreenMap() {
+    const modal = document.getElementById('fullscreen-map-modal');
+    modal.classList.add('opacity-0', 'pointer-events-none');
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,18 @@
+접속주소 :
+리스트
+http://localhost:8080/review/list
+작성
+http://localhost:8080/review/register
+수정
+http://localhost:8080/review/modify
+상세보기
+http://localhost:8080/review/read
+
+프로퍼티지
+spring.servlet.multipart.location=C:\\upload\\springTest
+#spring.servlet.multipart.location=/Users/yoo/upload/springTest
+spring.servlet.multipart.max-request-size=100MB
+spring.servlet.multipart.max-file-size=100MB
+
+build.gradle
+없음

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<head>
+    <meta charset="UTF-8">
+    <title>리뷰 관리 시스템</title>
+    <link rel="stylesheet" th:href="@{/css/review/review.css}">
+    <!-- 각 페이지별 추가적인 CSS -->
+    <th:block layout:fragment="css"></th:block>
+</head>
+<body>
+    <header>
+        <h1>리뷰 관리 시스템</h1>
+        <nav>
+            <ul>
+                <li><a href="/review/list">리뷰 목록</a></li>
+                <li><a href="/review/register">리뷰 등록</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <th:block layout:fragment="content"></th:block>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 리뷰 관리 시스템. All rights reserved.</p>
+    </footer>
+
+    <!-- 각 페이지별 JavaScript -->
+    <th:block layout:fragment="script"></th:block>
+</body>
+</html>

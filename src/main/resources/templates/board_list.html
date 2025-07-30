@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>맛슐랭 원정대</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #fafafa;
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+
+        .nav-top {
+            font-size: 0.95rem;
+            margin-bottom: 10px;
+        }
+
+        .nav-top a {
+            margin: 0 10px;
+            color: #555;
+            text-decoration: none;
+        }
+
+        .nav-top a:hover {
+            font-weight: bold;
+            color: #222;
+        }
+
+        .board-title-box {
+            background-color: #ff7f50;
+            padding: 12px 24px;
+            color: white;
+            border-radius: 8px;
+            font-size: 1.8rem;
+            display: inline-block;
+            margin-top: 30px;
+            margin-bottom: 30px;
+        }
+
+        .filter-section {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .filter-form {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .filter-form select {
+            width: 150px;
+            font-size: 0.9rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead tr {
+            border-bottom: 1px solid #ccc;
+            font-weight: bold;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid #eee;
+        }
+
+        td, th {
+            padding: 12px 8px;
+            text-align: center;
+        }
+
+        td.title-cell {
+            text-align: left;
+        }
+
+        .expired {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .deadline-soon {
+            color: #fd7e14;
+            font-weight: bold;
+        }
+
+        .search-write {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            align-items: center;
+        }
+
+        .search-form {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 60%;
+        }
+
+        .search-form select {
+            width: 120px;
+            font-size: 0.9rem;
+        }
+
+        .search-form input {
+            flex: 1;
+            font-size: 0.9rem;
+        }
+
+        .search-form button {
+            font-size: 0.9rem;
+        }
+
+        .pagination-container {
+            display: flex;
+            justify-content: center;
+            margin: 30px 0;
+        }
+
+        .pagination .page-link {
+            color: #ff7f50;
+            border-color: #ff7f50;
+        }
+
+        .pagination .page-link:hover {
+            background-color: #ff7f50;
+            border-color: #ff7f50;
+            color: white;
+        }
+
+        .gender-badge {
+            padding: 2px 6px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            color: white;
+        }
+
+        .gender-male {
+            background-color: #007bff;
+        }
+
+        .gender-female {
+            background-color: #e83e8c;
+        }
+
+        .gender-any {
+            background-color: #6c757d;
+        }
+
+        .food-badge {
+            padding: 2px 6px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            background-color: #28a745;
+            color: white;
+        }
+
+        .countdown-timer {
+            font-size: 0.8rem;
+            color: #fd7e14;
+            font-weight: bold;
+        }
+
+        .user-gender-selector {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+        }
+    </style>
+    <script>
+        // 실시간 카운트다운 업데이트
+        function updateCountdowns() {
+            const timers = document.querySelectorAll('.countdown-timer');
+            timers.forEach(timer => {
+                const remainingMinutes = parseInt(timer.dataset.remaining);
+                if (remainingMinutes <= 0) {
+                    timer.textContent = '마감';
+                    timer.className = 'expired';
+                    return;
+                }
+
+                const now = new Date().getTime();
+                const deadlineTime = now + (remainingMinutes * 60 * 1000);
+
+                const interval = setInterval(() => {
+                    const currentTime = new Date().getTime();
+                    const distance = deadlineTime - currentTime;
+
+                    if (distance < 0) {
+                        timer.textContent = '마감';
+                        timer.className = 'expired';
+                        clearInterval(interval);
+                        return;
+                    }
+
+                    const hours = Math.floor(distance / (1000 * 60 * 60));
+                    const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+
+                    if (hours > 0) {
+                        timer.textContent = hours + '시간 ' + minutes + '분';
+                    } else {
+                        timer.textContent = minutes + '분';
+                        if (minutes <= 30) {
+                            timer.className = 'deadline-soon';
+                        }
+                    }
+                }, 1000);
+            });
+        }
+
+        // 사용자 성별을 링크에 추가하는 함수
+        function addgender(link) {
+            const genderSelect = document.getElementById('genderSelect');
+            if (genderSelect) {
+                const gender = genderSelect.value;
+                const href = link.getAttribute('href');
+                if (href.includes('gender=')) {
+                    link.setAttribute('href', href.replace(/gender=[^&]*/, 'gender=' + encodeURIComponent(gender)));
+                } else {
+                    const separator = href.includes('?') ? '&' : '?';
+                    link.setAttribute('href', href + separator + 'gender=' + encodeURIComponent(gender));
+                }
+            }
+        }
+
+        window.onload = function() {
+            updateCountdowns();
+        };
+    </script>
+</head>
+<body class="container">
+
+
+
+<!-- 상단 메뉴 -->
+<div class="nav-top text-center mt-3">
+    <a href="#">오점머</a>
+    <a href="#">맛잘알모집소</a>
+    <a href="#">오점완</a>
+    <a href="#">맛집정보</a>
+    <a href="#">신고센터</a>
+    <a href="#">MyPage</a>
+    <a href="#">맛지도</a>
+</div>
+
+<!-- 주황 박스 제목 -->
+<div class="text-center">
+    <div class="board-title-box">맛슐랭 원정대</div>
+</div>
+
+<!-- 필터링 섹션 -->
+<div class="filter-section">
+    <form method="get" action="/board/list" class="filter-form">
+        <label><strong>필터:</strong></label>
+        <select name="genderFilter" class="form-select">
+            <option value="">성별 전체</option>
+            <option value="남" th:selected="${param.genderFilter == '남'}">남성 전용</option>
+            <option value="여" th:selected="${param.genderFilter == '여'}">여성 전용</option>
+            <option value="성별상관무" th:selected="${param.genderFilter == '성별상관무'}">성별무관</option>
+        </select>
+        <select name="foodFilter" class="form-select">
+            <option value="">음식 전체</option>
+            <option value="한식" th:selected="${param.foodFilter == '한식'}">한식</option>
+            <option value="중식" th:selected="${param.foodFilter == '중식'}">중식</option>
+            <option value="일식" th:selected="${param.foodFilter == '일식'}">일식</option>
+            <option value="분식" th:selected="${param.foodFilter == '분식'}">분식</option>
+            <option value="디저트" th:selected="${param.foodFilter == '디저트'}">디저트</option>
+            <option value="종류 안가림" th:selected="${param.foodFilter == '종류 안가림'}">종류 안가림</option>
+        </select>
+        <button class="btn btn-outline-primary btn-sm" type="submit">필터 적용</button>
+        <a href="/board/list" class="btn btn-outline-secondary btn-sm">필터 초기화</a>
+
+        <!-- 기존 검색 조건 유지 -->
+        <input type="hidden" name="type" th:value="${param.type}">
+        <input type="hidden" name="keyword" th:value="${param.keyword}">
+    </form>
+</div>
+
+<!-- 게시글 목록 -->
+<table>
+    <thead>
+    <tr>
+        <th style="width: 8%;">성별</th>
+        <th style="width: 8%;">음식</th>
+        <th style="width: 6%;">No</th>
+        <th style="width: 50%;">제목</th>
+        <th style="width: 8%;">글쓴이</th>
+        <th style="width: 8%;">위치</th>
+        <th style="width: 8%;">작성시간</th>
+        <th style="width: 4%;">마감</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="b, i : ${responseDTO.dtoList}">
+        <td>
+            <span th:class="${b.genderLimit == '남'} ? 'gender-badge gender-male' :
+                           (${b.genderLimit == '여'} ? 'gender-badge gender-female' : 'gender-badge gender-any')"
+                  th:text="${b.genderLimit}">성별</span>
+        </td>
+        <td>
+            <span class="food-badge" th:text="${b.foodCategory}">음식</span>
+        </td>
+        <td th:text="${responseDTO.totalCount - (responseDTO.pageRequestDTO.page - 1) * responseDTO.pageRequestDTO.size - i.index}">1</td>
+        <td class="title-cell">
+            <a th:href="@{/board/read(id=${b.id}, gender='성별상관무', page=${responseDTO.current}, type=${param.type}, keyword=${param.keyword}, genderFilter=${param.genderFilter}, foodFilter=${param.foodFilter})}"
+               th:text="${b.title}" onclick="addgender(this)">제목</a>
+        </td>
+        <td th:text="${b.writer}">글쓴이</td>
+        <td th:text="${b.region}">지역</td>
+        <td th:text="${#temporals.format(b.createdAt, 'yyyy-MM-dd HH:mm')}">작성시간</td>
+        <td>
+            <span th:if="${b.isExpired()}" class="expired">마감</span>
+            <span th:unless="${b.isExpired()}"
+                  class="countdown-timer"
+                  th:data-remaining="${b.getRemainingMinutes()}"
+                  th:text="${b.getRemainingMinutes() > 60} ?
+                          (${b.getRemainingMinutes() / 60} + '시간') :
+                          (${b.getRemainingMinutes()} + '분')">시간</span>
+        </td>
+    </tr>
+    </tbody>
+</table>
+
+<!-- 페이징 -->
+<div class="pagination-container">
+    <nav aria-label="Page navigation">
+        <ul class="pagination">
+            <li class="page-item" th:if="${responseDTO.prev}">
+                <a class="page-link" th:href="@{/board/list(page=${responseDTO.prevPage}, type=${param.type}, keyword=${param.keyword}, genderFilter=${param.genderFilter}, foodFilter=${param.foodFilter})}">이전</a>
+            </li>
+
+            <li th:each="i : ${responseDTO.pageNumList}"
+                th:class="${i == responseDTO.current} ? 'page-item active' : 'page-item'">
+                <a class="page-link" th:href="@{/board/list(page=${i}, type=${param.type}, keyword=${param.keyword}, genderFilter=${param.genderFilter}, foodFilter=${param.foodFilter})}" th:text="${i}">1</a>
+            </li>
+
+            <li class="page-item" th:if="${responseDTO.next}">
+                <a class="page-link" th:href="@{/board/list(page=${responseDTO.nextPage}, type=${param.type}, keyword=${param.keyword}, genderFilter=${param.genderFilter}, foodFilter=${param.foodFilter})}">다음</a>
+            </li>
+        </ul>
+    </nav>
+</div>
+
+<!-- 검색 & 글쓰기 -->
+<div class="search-write">
+    <form method="get" action="/board/list" class="search-form">
+        <select name="type" class="form-select">
+            <option value="">전체</option>
+            <option value="t" th:selected="${param.type == 't'}">제목</option>
+            <option value="w" th:selected="${param.type == 'w'}">글쓴이</option>
+            <option value="c" th:selected="${param.type == 'c'}">내용</option>
+            <option value="tw" th:selected="${param.type == 'tw'}">제목+글쓴이</option>
+            <option value="tc" th:selected="${param.type == 'tc'}">제목+내용</option>
+        </select>
+        <input type="text" name="keyword" class="form-control" placeholder="검색어를 입력하세요" th:value="${param.keyword}">
+        <button class="btn btn-primary" type="submit">검색</button>
+
+        <!-- 필터 조건 유지 -->
+        <input type="hidden" name="genderFilter" th:value="${param.genderFilter}">
+        <input type="hidden" name="foodFilter" th:value="${param.foodFilter}">
+    </form>
+
+    <div>
+        <a href="/board/register" class="btn btn-success">글쓰기</a>
+    </div>
+</div>
+
+</body>
+</html>

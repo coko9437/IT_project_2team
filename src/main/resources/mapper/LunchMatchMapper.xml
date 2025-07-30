@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="webproject_2team.lunch_matching.mapper.LunchMatchMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="rno">
+        insert into lunch_match (name, address, phone_number, category, latitude, longitude, rating, price_level, operating_hours)
+        values (#{name}, #{address}, #{phoneNumber}, #{category}, #{latitude}, #{longitude}, #{rating}, #{priceLevel}, #{operatingHours})
+    </insert>
+
+    <select id="selectOne" resultType="webproject_2team.lunch_matching.dto.LunchMatchDTO">
+        select * from lunch_match where rno = #{rno}
+    </select>
+
+    <select id="selectAll" resultType="webproject_2team.lunch_matching.dto.LunchMatchDTO">
+        select * from lunch_match order by rno desc
+    </select>
+
+    <update id="update">
+        update lunch_match
+        set name = #{name}, address = #{address}, phone_number = #{phoneNumber}, category = #{category},
+            latitude = #{latitude}, longitude = #{longitude}, rating = #{rating},
+            price_level = #{priceLevel}, operating_hours = #{operatingHours}
+        where rno = #{rno}
+    </update>
+
+    <delete id="delete">
+        delete from lunch_match where rno = #{rno}
+    </delete>
+
+    <select id="searchAndSort" resultType="webproject_2team.lunch_matching.dto.LunchMatchDTO">
+        SELECT * FROM lunch_match
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (name LIKE CONCAT('%', #{keyword}, '%') OR address LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="category != null and category != ''">
+                AND category = #{category}
+            </if>
+            <if test="minRating != null">
+                AND rating >= #{minRating}
+            </if>
+        </where>
+        <if test="orderBy != null and orderBy != ''">
+            ORDER BY
+            <choose>
+                <when test="orderBy == 'name'">name</when>
+                <when test="orderBy == 'rating_desc'">rating DESC</when>
+                <when test="orderBy == 'rating_asc'">rating ASC</when>
+                <otherwise>rno DESC</otherwise>
+            </choose>
+        </if>
+        <if test="orderBy == null or orderBy == ''">
+            ORDER BY rno DESC
+        </if>
+    </select>
+
+    <select id="selectListWithPaging" resultType="webproject_2team.lunch_matching.dto.LunchMatchDTO">
+        SELECT * FROM lunch_match
+        ORDER BY rno DESC
+            LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="getTotalCount" resultType="int">
+        SELECT count(*) FROM lunch_match
+    </select>
+
+</mapper>

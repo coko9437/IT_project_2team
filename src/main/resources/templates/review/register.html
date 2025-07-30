@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/layout}">
+<head>
+    <title>리뷰 등록</title>
+    <link rel="stylesheet" th:href="@{/css/review/register.css}">
+</head>
+<body>
+<div layout:fragment="content">
+    <h1>새 리뷰 등록</h1>
+
+    <form th:action="@{/review/register}" method="post">
+        <label for="member_id">작성자 ID:</label>
+        <input type="text" id="member_id" name="member_id" required>
+
+        <label for="content">내용:</label>
+        <textarea id="content" name="content" required></textarea>
+
+        <label for="menu">메뉴:</label>
+        <input type="text" id="menu" name="menu" required>
+
+        <label for="place">장소:</label>
+        <input type="text" id="place" name="place" required>
+
+        <label for="rating">평점 (1-5):</label>
+        <div id="star-rating">
+            <span class="star" data-value="1">★</span>
+            <span class="star" data-value="2">★</span>
+            <span class="star" data-value="3">★</span>
+            <span class="star" data-value="4">★</span>
+            <span class="star" data-value="5">★</span>
+        </div>
+        <input type="hidden" id="rating" name="rating" value="0" required>
+
+        <label for="fileInput">사진 업로드:</label>
+        <input type="file" id="fileInput" multiple>
+        <div id="uploadResult" class="upload-result-area">
+            <!-- 업로드된 파일 미리보기가 여기에 표시됩니다. -->
+        </div>
+        <div id="uploadLoading" class="upload-loading-area" style="display: none;">
+            파일 업로드 중...
+        </div>
+
+        <label for="emotion">감정:</label>
+        <select id="emotion" name="emotion" required>
+            <option th:each="entry : ${emotionMap}" th:value="${entry.key}"
+                    th:text="${emoticonMap.get(entry.key)}"></option>
+        </select>
+        <div>
+            <button type="submit" id="submitButton" disabled>등록</button>
+        </div>
+    </form>
+
+    <a href="/review/list" class="back-link">리뷰 목록으로 돌아가기</a>
+</div>
+</body>
+<th:block layout:fragment="script">
+    <script th:src="@{/js/review/register.js}"></script>
+</th:block>
+</html>
