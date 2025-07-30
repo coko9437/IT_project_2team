@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>게시글 수정</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f8f9fa; }
+        .container-box { display: flex; margin-top: 30px; }
+        .sidebar { width: 200px; margin-right: 30px; flex-shrink: 0; }
+        .sidebar .menu { background-color: #ff7f50; color: white; padding: 10px; border-radius: 5px 5px 0 0; text-align: center; font-weight: bold; }
+        .sidebar ul { list-style: none; padding-left: 0; background-color: #ffe2d5; margin: 0; border-radius: 0 0 5px 5px; }
+        .sidebar ul li { margin: 0; padding: 10px 0; text-align: center; font-size: 0.95rem; border-bottom: 1px solid #f3c8b8; }
+        .sidebar ul li:last-child { border-bottom: none; }
+        .form-area { flex-grow: 1; }
+        .form-area h2 { margin-bottom: 20px; }
+        .form-control { margin-bottom: 15px; }
+        .form-select { font-size: 0.9rem; }
+        textarea.form-control { height: 150px; }
+        .btn-area { display: flex; gap: 10px; margin-top: 20px; }
+        .char-counter { font-size: 0.8rem; color: #6c757d; text-align: right; margin-top: -10px; margin-bottom: 10px; }
+        .char-counter.over-limit { color: #dc3545; font-weight: bold; }
+
+        /* 지도 관련 스타일 */
+        #map-section { display: grid; grid-template-columns: 1fr 1.5fr; gap: 20px; height: 450px; margin-bottom: 15px;}
+        #map-controls { display: flex; flex-direction: column; overflow: hidden; }
+        #placesList { list-style: none; padding: 0; margin: 0; flex-grow: 1; overflow-y: auto; border: 1px solid #dee2e6; border-radius: .25rem; }
+        #placesList li { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
+        #placesList li:hover { background-color: #f0f0f0; }
+        #placesList .highlighted { background-color: #e0f2fe !important; font-weight: bold; }
+        #map-wrapper { position: relative; width: 100%; height: 100%; }
+        #map { width: 100%; height: 100%; border-radius: 8px; }
+        .info { padding: 5px; border-radius: 5px; background: #fff; border: 1px solid #ccc; white-space: nowrap; }
+        .info .title { font-weight: bold; font-size: 14px; }
+        #pagination { flex-shrink: 0; padding-top: 10px; }
+        #pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+</head>
+<body class="container">
+
+<div class="container-box">
+    <div class="sidebar">
+        <div class="menu">메뉴</div>
+        <ul>
+            <li><a href="#" style="text-decoration:none;">오점머</a></li>
+            <li><a href="#" style="text-decoration:none;">맛잘알모집소</a></li>
+            <li><a href="#" style="text-decoration:none;">오점완</a></li>
+            <li><a href="#" style="text-decoration:none;">맛집정보</a></li>
+            <li><a href="#" style="text-decoration:none;">신고센터</a></li>
+            <li><a href="#" style="text-decoration:none;">MyPage</a></li>
+            <li><a href="#" style="text-decoration:none;">맛지도</a></li>
+        </ul>
+    </div>
+
+    <div class="form-area">
+        <h2>게시글 수정</h2>
+        <form method="post" th:action="@{/board/modify}" th:object="${board}" onsubmit="return validateForm()">
+            <input type="hidden" name="id" th:field="*{id}">
+            <input type="text" id="title" name="title" class="form-control" placeholder="제목을 입력하세요" maxlength="100" th:field="*{title}">
+            <div id="titleCounter" class="char-counter">0/100 bytes</div>
+
+            <input type="text" id="writer" name="writer" class="form-control" th:field="*{writer}" readonly>
+            <input type="text" id="region" name="region" class="form-control" placeholder="주요 활동 지역 (예: 부산진구)" th:field="*{region}">
+
+            <div class="mt-3">
+                <h5 class="mb-3">📍 모집 장소 수정</h5>
+                <div id="map-section">
+                    <div id="map-controls">
+                        <div class="input-group mb-3">
+                            <input type="text" id="keyword" class="form-control" placeholder="새로운 장소 검색">
+                            <button class="btn btn-outline-primary" type="button" onclick="performSearch(1)">검색</button>
+                        </div>
+                        <ul id="placesList">
+                            <li class="text-center text-muted p-5">
+                                <strong>현재 설정된 장소</strong><br>
+                                <small th:text="${board.locationName ?: '새로운 장소를 검색하여 선택하세요.'}"></small>
+                            </li>
+                        </ul>
+                        <div id="pagination" class="d-flex justify-content-between align-items-center mt-3">
+                            <button id="prevBtn" class="btn btn-sm btn-outline-secondary" onclick="movePage(-1)" disabled>이전</button>
+                            <span id="pageInfo" class="text-muted small"></span>
+                            <button id="nextBtn" class="btn btn-sm btn-outline-secondary" onclick="movePage(1)" disabled>다음</button>
+                        </div>
+                    </div>
+                    <div id="map-wrapper">
+                        <div id="map"></div>
+                        <button type="button" onclick="displayMyLocation()" class="btn btn-light btn-sm position-absolute shadow-sm" style="top: 10px; right: 10px; z-index: 2;">내 위치</button>
+                        <select id="radiusSelect" onchange="changeSearchRadius()" class="form-select form-select-sm position-absolute shadow-sm" style="top: 10px; left: 10px; z-index: 2; width: auto;">
+                            <option value="500" selected>500m</option>
+                            <option value="1000">1km</option>
+                            <option value="2000">2km</option>
+                            <option value="5000">5km</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="alert alert-info" id="selectedLocationDisplay">현재 장소: <span th:text="${board.locationName ?: '없음'}"></span></div>
+            <input type="hidden" id="latitude" name="latitude" th:field="*{latitude}">
+            <input type="hidden" id="longitude" name="longitude" th:field="*{longitude}">
+            <input type="hidden" id="locationName" name="locationName" th:field="*{locationName}">
+
+            <div class="row mt-3">
+                <div class="col-md-4">
+                    <label class="form-label">성별 제한</label>
+                    <select name="genderLimit" class="form-select" th:field="*{genderLimit}">
+                        <option value="성별상관무">성별상관무</option>
+                        <option value="남">남</option>
+                        <option value="여">여</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">음식 카테고리</label>
+                    <select name="foodCategory" class="form-select" th:field="*{foodCategory}">
+                        <option value="종류 안가림">종류 안가림</option>
+                        <option value="한식">한식</option>
+                        <option value="중식">중식</option>
+                        <option value="일식">일식</option>
+                        <option value="분식">분식</option>
+                        <option value="디저트">디저트</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">마감시간</label>
+                    <select id="deadlineHours" name="deadlineHours" class="form-select" th:field="*{deadlineHours}" required>
+                        <option value="1">1시간 후</option>
+                        <option value="2">2시간 후</option>
+                        <option value="3">3시간 후</option>
+                        <option value="24">24시간 후</option>
+                    </select>
+                </div>
+            </div>
+
+            <textarea id="content" name="content" class="form-control mt-3" placeholder="본문 내용을 작성하세요" th:field="*{content}"></textarea>
+            <div id="contentCounter" class="char-counter">0/2000 bytes</div>
+
+            <div class="btn-area">
+                <button type="submit" class="btn btn-success">수정 완료</button>
+                <a th:href="@{/board/read(id=${board.id})}" class="btn btn-secondary">취소</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script th:src="|//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoJsApiKey}&libraries=services|"></script>
+<script th:inline="javascript">
+    const boardData = {
+        latitude: /*[[${board.latitude}]]*/ null,
+        longitude: /*[[${board.longitude}]]*/ null,
+        locationName: /*[[${board.locationName}]]*/ null
+    };
+
+    function getByteLength(str) { return new Blob([str], {type: 'text/plain'}).size; }
+    function removeAllChildNods(el) { while (el.hasChildNodes()) el.removeChild(el.lastChild); }
+
+    kakao.maps.load(function() {
+        // --- 변수 선언 ---
+        let map, infowindow, ps;
+        let mainMarker, myLocationMarker, myLocationCircle;
+        let searchedMarkers = [], searchedPlaces = [], currentActiveMarker = null;
+        let currentPage = 1, totalPage = 1;
+        let userLocation = null, currentSearchRadius = 500;
+
+        // --- 기능 함수 ---
+        function initialize() {
+            infowindow = new kakao.maps.InfoWindow({zIndex:1, removable: true});
+            ps = new kakao.maps.services.Places();
+            const mapContainer = document.getElementById('map');
+            const mapOption = { center: new kakao.maps.LatLng(35.1576, 129.0594), level: 5 };
+            map = new kakao.maps.Map(mapContainer, mapOption);
+
+            // 기존 위치가 있으면 메인 마커로 표시
+            if (boardData.latitude != null && boardData.longitude != null) {
+                const mainPosition = new kakao.maps.LatLng(boardData.latitude, boardData.longitude);
+                mainMarker = new kakao.maps.Marker({
+                    position: mainPosition,
+                    image: new kakao.maps.MarkerImage('http://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png', new kakao.maps.Size(31, 35))
+                });
+                mainMarker.setMap(map);
+                map.setCenter(mainPosition);
+            }
+
+            // 이벤트 리스너 연결
+            document.getElementById('keyword').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); performSearch(1); }
+            });
+            const titleInput = document.getElementById('title');
+            const contentInput = document.getElementById('content');
+            titleInput.addEventListener('input', () => checkLength(titleInput, 100, 'titleCounter'));
+            contentInput.addEventListener('input', () => checkLength(contentInput, 2000, 'contentCounter'));
+            checkLength(titleInput, 100, 'titleCounter');
+            checkLength(contentInput, 2000, 'contentCounter');
+        }
+
+        window.performSearch = async function(page) {
+            currentPage = page;
+            const keyword = document.getElementById('keyword').value.trim();
+            if (!keyword) { alert('장소 키워드를 입력해주세요!'); return; }
+
+            try {
+                const response = await fetch(`/lunchmatch/searchKakaoPlaces?query=${encodeURIComponent(keyword)}&page=${page}`);
+                if (!response.ok) throw new Error('서버 API 호출 실패');
+
+                const data = await response.json();
+                searchedPlaces = data.documents;
+                displayPlaces(searchedPlaces);
+                renderPagination(data.meta);
+            } catch (error) {
+                console.error('검색 오류:', error);
+                alert('장소 검색 중 오류가 발생했습니다.');
+            }
+        }
+
+        function displayPlaces(places) {
+            const listEl = document.getElementById('placesList');
+            removeAllChildNods(listEl);
+            clearSearchedMarkers();
+            if (!places || places.length === 0) {
+                listEl.innerHTML = '<li class="text-center text-muted p-5">검색 결과가 없습니다.</li>';
+                return;
+            }
+
+            const bounds = new kakao.maps.LatLngBounds();
+            places.forEach((place, i) => {
+                const placePosition = new kakao.maps.LatLng(place.y, place.x);
+                const marker = addSearchedMarker(placePosition, i, place.id);
+                const itemEl = getListItem(i, place);
+                bounds.extend(placePosition);
+
+                itemEl.onmouseover = () => {
+                    if (currentActiveMarker !== marker) marker.setImage(marker.hoverImage);
+                    infowindow.setContent(`<div class="info"><div class="title">${place.place_name}</div></div>`);
+                    infowindow.open(map, marker);
+                };
+                itemEl.onmouseout = () => {
+                    if (currentActiveMarker !== marker) marker.setImage(marker.normalImage);
+                    infowindow.close();
+                };
+                itemEl.onclick = () => {
+                    if (currentActiveMarker && currentActiveMarker !== marker) currentActiveMarker.setImage(currentActiveMarker.normalImage);
+                    marker.setImage(marker.hoverImage);
+                    map.panTo(marker.getPosition());
+                    currentActiveMarker = marker;
+                    highlightListItem(place.id);
+                };
+                listEl.appendChild(itemEl);
+            });
+            if(mainMarker) bounds.extend(mainMarker.getPosition());
+            map.setBounds(bounds);
+        }
+
+        function getListItem(index, place) {
+            const el = document.createElement('li');
+            el.dataset.placeId = place.id;
+            el.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center p-2">
+                    <div>
+                        <h6 class="mb-0">${index + 1}. ${place.place_name}</h6>
+                        <small class="text-muted">${place.road_address_name || place.address_name}</small>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-success" onclick="event.stopPropagation(); selectPlace(${index});">선택</button>
+                </div>`;
+            return el;
+        }
+
+        function addSearchedMarker(position, idx, placeId) {
+            const normalSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_number_blue.png';
+            const hoverSrc = 'http://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png';
+            const imageSize = new kakao.maps.Size(36, 37);
+            const hoverSize = new kakao.maps.Size(31, 35);
+            const normalOptions = { spriteSize: new kakao.maps.Size(36, 691), spriteOrigin: new kakao.maps.Point(0, (idx * 46) + 10), offset: new kakao.maps.Point(13, 37) };
+
+            const marker = new kakao.maps.Marker({ position: position, image: new kakao.maps.MarkerImage(normalSrc, imageSize, normalOptions) });
+            marker.normalImage = new kakao.maps.MarkerImage(normalSrc, imageSize, normalOptions);
+            marker.hoverImage = new kakao.maps.MarkerImage(hoverSrc, hoverSize, { offset: new kakao.maps.Point(13, 34) });
+            marker.placeId = placeId;
+            marker.setMap(map);
+            searchedMarkers.push(marker);
+            return marker;
+        }
+
+        function clearSearchedMarkers() {
+            searchedMarkers.forEach(m => m.setMap(null));
+            searchedMarkers = [];
+            currentActiveMarker = null;
+        }
+
+        function highlightListItem(placeId) {
+            document.querySelectorAll('#placesList li.highlighted').forEach(el => el.classList.remove('highlighted'));
+            const itemEl = document.querySelector(`#placesList li[data-place-id="${placeId}"]`);
+            if (itemEl) itemEl.classList.add('highlighted');
+        }
+
+        function renderPagination(meta) {
+            const pageableCount = meta.pageable_count > 45 ? 45 : meta.pageable_count;
+            totalPage = Math.ceil(pageableCount / 15);
+            document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPage}`;
+            document.getElementById('prevBtn').disabled = currentPage === 1;
+            document.getElementById('nextBtn').disabled = currentPage === totalPage || meta.is_end;
+        }
+
+        window.movePage = function(delta) {
+            const newPage = currentPage + delta;
+            if (newPage > 0 && newPage <= totalPage) { performSearch(newPage); }
+        }
+
+        function getUserLocation(callback) {
+            if (userLocation) { callback(null, userLocation); return; }
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    pos => {
+                        userLocation = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+                        callback(null, userLocation);
+                    },
+                    () => { alert("위치 정보를 가져오는 데 실패했습니다."); callback(new Error("Geolocation failed.")); }
+                );
+            } else { alert("이 브라우저에서는 Geolocation을 지원하지 않습니다."); callback(new Error("Geolocation not supported.")); }
+        }
+
+        window.displayMyLocation = function() {
+            getUserLocation((err, locPosition) => {
+                if (err) return;
+                if (myLocationMarker) myLocationMarker.setMap(null);
+                myLocationMarker = new kakao.maps.Marker({ map: map, position: locPosition, image: new kakao.maps.MarkerImage('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png', new kakao.maps.Size(24, 35)) });
+                if (myLocationCircle) myLocationCircle.setMap(null);
+                myLocationCircle = new kakao.maps.Circle({ map: map, center: locPosition, radius: currentSearchRadius, strokeWeight: 2, strokeColor: '#004CFF', fillColor: '#CCE7FF', fillOpacity: 0.5 });
+                const bounds = new kakao.maps.LatLngBounds();
+                bounds.extend(locPosition);
+                if (mainMarker) bounds.extend(mainMarker.getPosition());
+                map.setBounds(bounds);
+            });
+        }
+
+        window.changeSearchRadius = function() {
+            currentSearchRadius = parseInt(document.getElementById('radiusSelect').value, 10);
+            if (myLocationCircle) {
+                myLocationCircle.setRadius(currentSearchRadius);
+            }
+        }
+
+        window.selectPlace = function(index) {
+            const place = searchedPlaces[index];
+            if (!place) return;
+
+            document.getElementById('latitude').value = place.y;
+            document.getElementById('longitude').value = place.x;
+            document.getElementById('locationName').value = place.place_name;
+
+            const displayEl = document.getElementById('selectedLocationDisplay');
+            displayEl.textContent = `선택된 장소: ${place.place_name} (${place.road_address_name || place.address_name})`;
+            displayEl.classList.replace('alert-info', 'alert-success');
+
+            if(mainMarker) mainMarker.setMap(null); // 기존 메인 마커 제거
+            const newMainPosition = new kakao.maps.LatLng(place.y, place.x);
+            mainMarker = new kakao.maps.Marker({
+                position: newMainPosition,
+                image: new kakao.maps.MarkerImage('http://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png', new kakao.maps.Size(31, 35))
+            });
+            mainMarker.setMap(map);
+            map.setCenter(newMainPosition);
+
+            const address = place.address_name;
+            const match = address.match(/(\S+[시|도])\s(\S+[구|군])/);
+            if (match && match[2]) document.getElementById('region').value = match[2];
+            alert(`'${place.place_name}'가 모집 장소로 선택되었습니다.`);
+        };
+
+        // --- 기존 페이지 기능 함수들 ---
+        const checkLength = (element, limit, counterId) => {
+            const text = element.value;
+            const byteLength = getByteLength(text);
+            const counter = document.getElementById(counterId);
+            counter.textContent = `${byteLength}/${limit} bytes`;
+            counter.classList.toggle('over-limit', byteLength > limit);
+        };
+
+        window.validateForm = function() {
+            const fields = [
+                { id: 'title', name: '제목', limit: 100 },
+                { id: 'content', name: '본문', limit: 2000 },
+                { id: 'writer', name: '작성자' },
+                { id: 'region', name: '지역' },
+                { id: 'deadlineHours', name: '마감시간' }
+            ];
+            for (const field of fields) {
+                const element = document.getElementById(field.id);
+                if (!element.value.trim()) {
+                    alert(`${field.name}을(를) 입력하거나 선택해주세요.`);
+                    element.focus();
+                    return false;
+                }
+                if (field.limit && getByteLength(element.value) > field.limit) {
+                    alert(`${field.name}은(는) ${field.limit}바이트를 초과할 수 없습니다.`);
+                    element.focus();
+                    return false;
+                }
+            }
+            if (!document.getElementById('locationName').value) {
+                alert('지도에서 모집 장소를 검색 후 선택해주세요.');
+                return false;
+            }
+            return true;
+        };
+
+        // --- 초기화 실행 ---
+        initialize();
+    });
+</script>
+</body>
+</html>
