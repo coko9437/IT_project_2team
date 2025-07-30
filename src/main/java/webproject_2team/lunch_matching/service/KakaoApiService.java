@@ -1,10 +1,14 @@
 package webproject_2team.lunch_matching.service;
 
-import  webproject_2team.lunch_matching.dto.KakaoLocalSearchResponse;
+import webproject_2team.lunch_matching.dto.KakaoLocalSearchResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -17,8 +21,9 @@ import java.util.Collections;
 @RequiredArgsConstructor
 public class KakaoApiService {
 
-    @Value("${kakao.api.key}")
-    private String kakaoApiKey;
+    // application-secret.properties에서 REST API 키 주입 (이전 kakao.api.key 이름을 변경해야 합니다)
+    @Value("${kakao.rest.api.key}") // 이름 변경됨: kakao.rest.api.key
+    private String kakaoRestApiKey; // 변수 이름도 변경하는 것이 좋습니다.
 
     @Value("${kakao.local.api.keyword.url}")
     private String kakaoLocalApiKeywordUrl;
@@ -29,7 +34,8 @@ public class KakaoApiService {
         log.info("카카오 API 키워드 장소 검색을 시작합니다. 검색어: {}, 페이지: {}", keyword, page);
 
         HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "KakaoAK " + kakaoApiKey);
+        // 주입받은 kakaoRestApiKey 변수 사용
+        headers.set("Authorization", "KakaoAK " + kakaoRestApiKey);
         headers.set(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
 
         HttpEntity<String> entity = new HttpEntity<>(headers);

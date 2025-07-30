@@ -9,7 +9,24 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
-    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=8318dbdbe87b39e59f31a321d6143d23&libraries=services"></script>
+    <script th:inline="javascript">
+        // Thymeleaf의 th:inline="javascript"를 사용하여 서버의 모델 데이터를 JavaScript 변수로 가져옵니다.
+        // 컨트롤러에서 model.addAttribute("kakaoJsApiKey", kakaoJavascriptApiKey); 로 전달된 값입니다.
+        const KAKAO_JAVASCRIPT_API_KEY = /*[[${kakaoJsApiKey}]]*/ 'YOUR_DEFAULT_KEY';
+
+        // 디버깅을 위해 콘솔에 키 값 출력 (배포 시에는 제거하거나 주석 처리 권장)
+        console.log("카카오 JavaScript API 키 (HTML에 주입됨):", KAKAO_JAVASCRIPT_API_KEY);
+
+        // Thymeleaf 모델에서 맛집 위도, 경도, rno, 이름 가져오기
+        const restaurantData = {
+            rno: /*[[${dto.rno}]]*/ null,
+            name: /*[[${dto.name}]]*/ 'Unknown Restaurant',
+            latitude: /*[[${dto.latitude}]]*/ null,
+            longitude: /*[[${dto.longitude}]]*/ null
+        };
+    </script>
+
+    <script th:src="|//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoJsApiKey}&libraries=services|"></script>
     <style>
         html, body {
             height: 100%;
@@ -93,20 +110,15 @@
     </main>
 </div>
 
-<script th:inline="javascript">
+<script>
     let map;
     let restaurantMarker;
     let userLocation = null;
     let myLocationMarker = null;
     let myLocationCircle = null;
 
-    // Thymeleaf 모델에서 맛집 위도, 경도, rno, 이름 가져오기
-    const restaurantData = {
-        rno: /*[[${dto.rno}]]*/ null,
-        name: /*[[${dto.name}]]*/ 'Unknown Restaurant',
-        latitude: /*[[${dto.latitude}]]*/ null,
-        longitude: /*[[${dto.longitude}]]*/ null
-    };
+    // restaurantData는 th:inline="javascript" 블록에서 이미 정의되었으므로 여기서 다시 정의할 필요 없습니다.
+    // 기존에 이곳에 있던 restaurantData 정의는 제거합니다.
 
     document.addEventListener('DOMContentLoaded', () => {
         console.log('DOMContentLoaded 이벤트 발생. 맛집 상세 정보:', restaurantData);

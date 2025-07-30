@@ -8,8 +8,17 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
-  <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=8318dbdbe87b39e59f31a321d6143d23&libraries=services"></script>
 
+  <script th:inline="javascript">
+    // Thymeleaf의 th:inline="javascript"를 사용하여 서버의 모델 데이터를 JavaScript 변수로 가져옵니다.
+    // 컨트롤러에서 model.addAttribute("kakaoJsApiKey", kakaoJavascriptApiKey); 로 전달된 값입니다.
+    const KAKAO_JAVASCRIPT_API_KEY = /*[[${kakaoJsApiKey}]]*/ 'YOUR_DEFAULT_KEY';
+
+    // 디버깅을 위해 콘솔에 키 값 출력 (배포 시에는 제거하거나 주석 처리 권장)
+    console.log("카카오 JavaScript API 키 (HTML에 주입됨):", KAKAO_JAVASCRIPT_API_KEY);
+  </script>
+
+  <script th:src="|//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoJsApiKey}&libraries=services,drawing|"></script>
   <style>
     html, body {
       height: 100%;
@@ -142,7 +151,6 @@
   </div>
 </div>
 
-<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=8318dbdbe87b39e59f31a321d6143d23&libraries=services"></script>
 <script>
   let map;
   let modalMap;
@@ -331,6 +339,7 @@
       el.onmouseout = () => {
         const targetMarker = markers.find(m => m.placeRno === match.rno);
         if (targetMarker && currentActiveMarker !== targetMarker) {
+          currentActiveMarker = null;
           targetMarker.setImage(targetMarker.normalImage);
           infowindow.close();
         }

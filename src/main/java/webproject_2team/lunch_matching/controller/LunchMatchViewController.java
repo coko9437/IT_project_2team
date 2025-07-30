@@ -1,14 +1,20 @@
 package webproject_2team.lunch_matching.controller;
 
-import  webproject_2team.lunch_matching.dto.LunchMatchDTO;
-import  webproject_2team.lunch_matching.service.LunchMatchService;
+import webproject_2team.lunch_matching.dto.LunchMatchDTO;
+import webproject_2team.lunch_matching.service.LunchMatchService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.beans.factory.annotation.Value; // @Value 임포트 추가
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.List;
@@ -21,27 +27,38 @@ public class LunchMatchViewController {
 
     private final LunchMatchService lunchMatchService;
 
+    // application-secret.properties에서 JavaScript API 키 주입
+    @Value("${kakao.javascript.api.key}")
+    private String kakaoJavascriptApiKey;
+
+    // 이 컨트롤러는 View를 반환하므로, REST API 키는 MapSearchController나 KakaoApiService에서 사용됩니다.
+    // 여기서는 필요에 따라 주입받거나, 사용하지 않을 수도 있습니다.
+    // @Value("${kakao.rest.api.key}")
+    // private String kakaoRestApiKey;
+
+
     @GetMapping("/list")
-    public String listPage( // 이 메서드는 이제 뷰(HTML)만 반환
-                            @RequestParam(value = "keyword", required = false, defaultValue = "") String keyword,
-                            @RequestParam(value = "category", required = false, defaultValue = "") String category,
-                            @RequestParam(value = "orderBy", required = false, defaultValue = "latest") String orderBy,
-                            @RequestParam(value = "minRating", required = false) Double minRating,
-                            Model model) {
+    public String listPage(
+            @RequestParam(value = "keyword", required = false, defaultValue = "") String keyword,
+            @RequestParam(value = "category", required = false, defaultValue = "") String category,
+            @RequestParam(value = "orderBy", required = false, defaultValue = "latest") String orderBy,
+            @RequestParam(value = "minRating", required = false) Double minRating,
+            Model model) {
 
         log.info("저장된 맛집 목록 페이지 요청 (뷰 렌더링용): keyword={}, category={}, orderBy={}, minRating={}", keyword, category, orderBy, minRating);
-        // model.addAttribute("lunchMatches", lunchMatches); // 데이터를 뷰로 직접 전달하지 않음
-        // 검색 파라미터를 뷰에 전달하여 폼의 기존 값 유지
         model.addAttribute("keyword", keyword);
         model.addAttribute("category", category);
         model.addAttribute("orderBy", orderBy);
         model.addAttribute("minRating", minRating);
+
+        // Thymeleaf 템플릿으로 JavaScript 키 전달
+        model.addAttribute("kakaoJsApiKey", kakaoJavascriptApiKey);
+
         return "lunchmatch/list"; // list.html 뷰 반환
     }
 
-    // --- 추가된 부분: 맛집 목록 데이터를 JSON으로 반환하는 API 엔드포인트 ---
     @GetMapping("/api/list")
-    @ResponseBody // 이 메서드는 JSON 데이터를 직접 응답합니다.
+    @ResponseBody
     public List<LunchMatchDTO> getLunchMatchesJson(
             @RequestParam(value = "keyword", required = false, defaultValue = "") String keyword,
             @RequestParam(value = "category", required = false, defaultValue = "") String category,
@@ -49,16 +66,16 @@ public class LunchMatchViewController {
             @RequestParam(value = "minRating", required = false) Double minRating) {
 
         log.info("맛집 목록 데이터 요청 (AJAX API용): keyword={}, category={}, orderBy={}, minRating={}", keyword, category, orderBy, minRating);
-        // 서비스에서 데이터를 조회하여 JSON으로 반환
         return lunchMatchService.searchAndSort(keyword, category, minRating, orderBy);
     }
-    // -------------------------------------------------------------------
 
     @GetMapping("/read/{rno}")
     public String read(@PathVariable("rno") Long rno, Model model) {
         log.info("맛집 상세 정보 페이지 요청: rno = " + rno);
         LunchMatchDTO lunchMatchDTO = lunchMatchService.getOne(rno);
         model.addAttribute("dto", lunchMatchDTO);
+        // Thymeleaf 템플릿으로 JavaScript 키 전달
+        model.addAttribute("kakaoJsApiKey", kakaoJavascriptApiKey);
         return "lunchmatch/read";
     }
 
@@ -67,6 +84,8 @@ public class LunchMatchViewController {
         log.info("맛집 수정 페이지 요청: rno = " + rno);
         LunchMatchDTO lunchMatchDTO = lunchMatchService.getOne(rno);
         model.addAttribute("dto", lunchMatchDTO);
+        // 수정 페이지에도 필요하다면 JavaScript 키 전달 (일반적으로 지도 없으면 필요 없음)
+        // model.addAttribute("kakaoJsApiKey", kakaoJavascriptApiKey);
         return "lunchmatch/modify";
     }
 
@@ -92,6 +111,8 @@ public class LunchMatchViewController {
     @GetMapping("/map")
     public String mapPage(Model model) {
         log.info("Request for lunchmatch map page...");
+        // Thymeleaf 템플릿으로 JavaScript 키 전달
+        model.addAttribute("kakaoJsApiKey", kakaoJavascriptApiKey);
         return "lunchmatch/map";
     }
 }
