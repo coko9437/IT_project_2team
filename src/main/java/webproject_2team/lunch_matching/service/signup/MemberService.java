@@ -24,6 +24,8 @@ public interface MemberService {
 //    Member getMemberByUsername(String username);
     MemberResponseDTO getMemberByUsername(String username);
 
+//    MemberResponseDTO getMemberByEmail(String email);
+
     // 회원 정보 조회 (ID로 조회하는 경우도 추가)
     MemberResponseDTO getMemberById(Long id);
 

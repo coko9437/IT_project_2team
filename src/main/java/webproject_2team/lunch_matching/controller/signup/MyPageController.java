@@ -32,7 +32,6 @@ public class MyPageController {
                 // MemberService를 통해 username으로 MemberResponseDTO 조회
                 // MemberService의 getMemberByUsername 메서드가 MemberResponseDTO를 반환하도록 수정되었음을 전제로 합니다.
                 MemberResponseDTO memberResponseDTO = memberService.getMemberByUsername(username);
-
                 // 조회된 MemberResponseDTO 객체를 모델에 추가하여 HTML로 전달
                 model.addAttribute("member", memberResponseDTO);
                 log.info("Member data added to model for myPage: Nickname={}, ProfileThumbnailUrl={}",

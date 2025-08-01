@@ -176,6 +176,7 @@
             <button class="tab-button active" onclick="showPosts('party', event)">파티모집 게시글</button>
             <button class="tab-button" onclick="showPosts('review', event)">식당후기 게시글</button>
         </div>
+
         <div id="partyPosts" class="post-list active">
             <h4>파티모집 게시글</h4>
             <ul th:if="${not #lists.isEmpty(partyPosts)}">
@@ -197,6 +198,7 @@
             <p th:unless="${not #lists.isEmpty(reviewPosts)}">작성한 식당후기 게시글이 없습니다.</p>
         </div>
     </div>
+</div>
 
     <div class="my-page-section bottom-section">
         <h3>내 정보 관리</h3>

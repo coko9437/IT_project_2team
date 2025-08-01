@@ -10,6 +10,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import webproject_2team.lunch_matching.domain.Review;
+import webproject_2team.lunch_matching.domain.UploadResult;
 import webproject_2team.lunch_matching.dto.ReviewPageRequestDTO;
 import webproject_2team.lunch_matching.dto.ReviewPageResponseDTO;
 import webproject_2team.lunch_matching.dto.ReviewDTO;
@@ -34,8 +35,10 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReviewLikeService reviewLikeService;
 
     @Override
+    @Transactional
     public Long register(ReviewDTO reviewDTO) {
         log.info("register...");
+        // 1. ReviewDTO를 Review 엔티티로 기본 매핑
         Review review = modelMapper.map(reviewDTO, Review.class);
 
         // ModelMapper가 이미 UploadResultDTO 리스트를 Review 엔티티의 fileList에 매핑합니다.
@@ -46,6 +49,23 @@ public class ReviewServiceImpl implements ReviewService {
         //     });
         // }
 
+        // 2. 파일 정보 (UploadResultDTO 리스트)를 UploadResult 임베디드 클래스로 변환하여 Review에 추가
+        if (reviewDTO.getUploadFileNames() != null && !reviewDTO.getUploadFileNames().isEmpty()) {
+            reviewDTO.getUploadFileNames().forEach(uploadResultDTO -> {
+                // UploadResultDTO를 UploadResult 임베디드 클래스로 변환
+                UploadResult uploadResult = UploadResult.builder()
+                        .uuid(uploadResultDTO.getUuid())
+                        .fileName(uploadResultDTO.getFileName())
+                        .isImage(uploadResultDTO.isImg()) // UploadResultDTO의 img를 UploadResult의 isImage에 매핑
+                        .build();
+
+                // Review 엔티티의 fileList에 UploadResult 객체 직접 추가
+                review.getFileList().add(uploadResult);
+            });
+        }
+
+
+        // 3. Review 엔티티 저장 (ReviewFile 엔티티는 cascade 설정에 따라 함께 저장됨)
         Long review_id = reviewRepository.save(review).getReview_id();
 
         log.info("Review entity before saving: " + review);

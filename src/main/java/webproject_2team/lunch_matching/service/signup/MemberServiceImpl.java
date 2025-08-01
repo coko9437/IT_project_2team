@@ -244,6 +244,8 @@ public class MemberServiceImpl implements MemberService {
         return entityToResponseDTO(member);
     }
 
+
+
     // ID로 회원 정보 조회
     @Override
     public MemberResponseDTO getMemberById(Long id) {
