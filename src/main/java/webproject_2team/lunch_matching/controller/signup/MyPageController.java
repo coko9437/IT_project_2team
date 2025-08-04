@@ -26,6 +26,7 @@ public class MyPageController {
 
         if (user != null) {
             String username = user.getUsername(); // 로그인된 사용자의 아이디 (username)
+            //email
             log.info("Accessing myPage for user: {}", username);
 
             try {

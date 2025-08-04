@@ -43,6 +43,8 @@ public class Review extends BaseEntity {
     @ElementCollection
     @Builder.Default
     private List<UploadResult> fileList = new ArrayList<>();
+    //@ElementCollection은 JPA에서 엔티티가 아닌 임베디드 타입(Embeddable) 컬렉션을 매핑할 때 사용합니다.
+    //문제는 @ElementCollection이 Review 엔티티와 review_file_list 테이블(UploadResult가 매핑될 테이블로 예상됩니다) 사이에 직접적인 연관 관계를 생성하지 않는다는 점입니다.
 
     @Builder.Default
     private int likeCount = 0; // 좋아요 수
