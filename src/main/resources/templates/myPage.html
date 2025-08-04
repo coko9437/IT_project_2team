@@ -7,35 +7,31 @@
     <th:block layout:fragment="css">
         <style>
             .my-page-section {
-                padding: 20px;
+                padding: 20px; /* 기존 20px 패딩 유지 */
                 display: flex;
                 flex-direction: column;
-                justify-content: center;
-                align-items: center;
+                justify-content: center; /* 세로 중앙 정렬 */
+                align-items: center;    /* 가로 중앙 정렬 */
                 text-align: center;
                 box-sizing: border-box;
-                padding-top: 80px; /* 대략적인 헤더 높이 + 여백. 실제 헤더 높이에 맞게 조정 */
+                /* padding-top: 80px; */ /* 이제 필요 없거나 조정이 필요할 수 있습니다. */
             }
 
-            .top-section {
-                flex: 1;
-                background-color: #e9ecef;
-                border-bottom: 1px solid #dee2e6;
+            .top-section, .middle-section, .bottom-section {
+                /* flex: 1; 이 속성을 제거하여 높이가 콘텐츠에 따라 유동적으로 변하도록 합니다. */
+                background-color: #e9ecef; /* 각 섹션 배경색은 유지 */
                 width: 100%;
-            }
-
-            .middle-section {
-                flex: 1;
-                background-color: #ffffff;
-                border-bottom: 1px solid #dee2e6;
-                width: 100%;
+                border-bottom: 1px solid #dee2e6; /* 각 섹션 하단 경계선 유지 */
             }
 
             .bottom-section {
-                flex: 1;
-                background-color: #e9ecef;
-                width: 100%;
+                background-color: #e9ecef; /* 배경색은 유지 */
+                border-bottom: none; /* 마지막 섹션은 하단 경계선 제거 */
             }
+            .middle-section {
+                background-color: #ffffff;
+            }
+
 
             .profile-image-container {
                 width: 150px;
@@ -182,7 +178,7 @@
             <ul th:if="${not #lists.isEmpty(partyPosts)}">
                 <li th:each="post : ${partyPosts}">
                     <a th:href="@{/party/detail/{id}(id=${post.id})}" th:text="${post.title}">파티모집 게시글 제목 예시</a>
-                    <span th:text="${#temporals.format(post.regDate, 'yyyy-MM-dd HH:mm')}">2025-07-30 10:30</span>
+                    <span th:text="${#temporals.format(post.createdAt, 'yyyy-MM-dd HH:mm')}">2025-07-30 10:30</span>
                 </li>
             </ul>
             <p th:unless="${not #lists.isEmpty(partyPosts)}">작성한 파티모집 게시글이 없습니다.</p>
@@ -198,7 +194,6 @@
             <p th:unless="${not #lists.isEmpty(reviewPosts)}">작성한 식당후기 게시글이 없습니다.</p>
         </div>
     </div>
-</div>
 
     <div class="my-page-section bottom-section">
         <h3>내 정보 관리</h3>
@@ -207,21 +202,20 @@
             <a href="/myPage/edit" class="btn btn-primary">내 정보 수정</a>
             <button id="deleteAccountBtn" class="btn btn-danger">내 정보 삭제</button>
         </div>
-</div>
-
-<th:block layout:fragment="script">
+    </div>
+</div> <th:block layout:fragment="script">
     <script src="/js/jquery-3.5.1.min.js"></script>
     <script src="/js/bootstrap.bundle.min.js"></script>
     <script th:inline="javascript">
         const csrfToken = /*[[${_csrf != null ? _csrf.token : ''}]]*/ '';
         const currentUsername = /*[[${member?.username}]]*/ '';
 
-        function showPosts(type, event) { // event 매개변수 추가
+        function showPosts(type, event) {
             document.querySelectorAll('.post-list').forEach(list => list.style.display = 'none');
             document.getElementById(type + 'Posts').style.display = 'block';
 
             document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-            if (event) { // event 객체가 유효한지 확인
+            if (event) {
                 event.currentTarget.classList.add('active');
             }
         }
